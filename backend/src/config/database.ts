@@ -1,0 +1,40 @@
+import mysql from 'mysql2/promise';
+import type { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { env } from './env';
+
+export const db = mysql.createPool({
+  host: env.DB_HOST,
+  port: env.DB_PORT,
+  user: env.DB_USER,
+  password: env.DB_PASS,
+  database: env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  ssl: { rejectUnauthorized: false }, // required for AWS RDS
+});
+
+/** Run a SELECT — returns typed rows. */
+export async function query<T = RowDataPacket>(
+  sql: string,
+  values?: unknown[],
+): Promise<T[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [rows] = await db.execute<(T & RowDataPacket)[]>(sql, values as any[]);
+  return rows as T[];
+}
+
+/** Run an INSERT / UPDATE / DELETE — returns the result header. */
+export async function execute(sql: string, values?: unknown[]): Promise<ResultSetHeader> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [result] = await db.execute<ResultSetHeader>(sql, values as any[]);
+  return result;
+}
+
+export async function checkDbConnection(): Promise<boolean> {
+  try {
+    await db.execute('SELECT 1');
+    return true;
+  } catch {
+    return false;
+  }
+}

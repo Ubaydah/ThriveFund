@@ -1,0 +1,36 @@
+# Transactions Module
+
+Read-only view of payment records. Transactions are created by the Nomba webhook processor — never directly by the client.
+
+## Endpoints
+
+### Standalone routes (mounted at `/api/v1/transactions`)
+
+| Method | Path | Auth | Status |
+|--------|------|------|--------|
+| GET    | `/api/v1/transactions` | User | ⬜ TODO |
+| GET    | `/api/v1/transactions/export` | User | ⬜ TODO |
+| GET    | `/api/v1/transactions/:id` | User (owner of linked goal) | ⬜ TODO |
+
+### Nested route (mounted inside Goals module)
+
+| Method | Path | Auth | Status |
+|--------|------|------|--------|
+| GET    | `/api/v1/goals/:id/transactions` | User (owner) | ⬜ TODO |
+
+## Query Params (`GET /transactions`)
+
+| Param | Description |
+|-------|-------------|
+| `goal_id` | Filter to one goal |
+| `status` | `successful` \| `pending` \| `failed` \| `duplicate` \| `pending_review` |
+| `from` | ISO date lower bound on `paid_at` |
+| `to` | ISO date upper bound on `paid_at` |
+| `q` | Text search on contributor name |
+| `page` / `per_page` | Pagination |
+
+## Notes
+
+- `/export` returns `text/csv`; must be defined before `/:id` in Express.
+- Transactions are owned by the user who owns the linked goal.
+- Requires DB tables: `transactions`, `goals`.

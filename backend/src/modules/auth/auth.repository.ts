@@ -1,0 +1,81 @@
+import { query, execute } from '../../config/database';
+
+export const authRepository = {
+  async findUserByEmail(email: string) {
+    const rows = await query('SELECT * FROM users WHERE email = ?', [email]);
+    return rows[0] ?? null;
+  },
+
+  async findUserById(id: string) {
+    const rows = await query(
+      'SELECT id, full_name, email, role FROM users WHERE id = ?',
+      [id],
+    );
+    return rows[0] ?? null;
+  },
+
+  async insertUser(data: {
+    id: string;
+    full_name: string;
+    email: string;
+    password_hash: string;
+    phone_number?: string | null;
+  }) {
+    await execute(
+      `INSERT INTO users (id, full_name, email, password_hash, phone_number, role, created_at)
+       VALUES (?, ?, ?, ?, ?, 'user', NOW())`,
+      [data.id, data.full_name, data.email, data.password_hash, data.phone_number ?? null],
+    );
+    const rows = await query(
+      'SELECT id, full_name, email, role, created_at FROM users WHERE id = ?',
+      [data.id],
+    );
+    return rows[0];
+  },
+
+  async insertRefreshToken(token: string, userId: string) {
+    await execute(
+      `INSERT INTO refresh_tokens (token, user_id, expires_at)
+       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))`,
+      [token, userId],
+    );
+  },
+
+  async findRefreshToken(token: string) {
+    const rows = await query(
+      'SELECT * FROM refresh_tokens WHERE token = ? AND expires_at > NOW()',
+      [token],
+    );
+    return rows[0] ?? null;
+  },
+
+  async deleteRefreshToken(token: string) {
+    await execute('DELETE FROM refresh_tokens WHERE token = ?', [token]);
+  },
+
+  async insertPasswordReset(data: { token: string; user_id: string; expires_at: Date }) {
+    await execute(
+      'INSERT INTO password_resets (token, user_id, expires_at) VALUES (?, ?, ?)',
+      [data.token, data.user_id, data.expires_at],
+    );
+  },
+
+  async findPasswordReset(token: string) {
+    const rows = await query(
+      'SELECT * FROM password_resets WHERE token = ? AND expires_at > NOW() AND used = 0',
+      [token],
+    );
+    return rows[0] ?? null;
+  },
+
+  async updatePasswordHash(userId: string, passwordHash: string) {
+    await execute(
+      'UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?',
+      [passwordHash, userId],
+    );
+  },
+
+  async markPasswordResetUsed(token: string) {
+    await execute('UPDATE password_resets SET used = 1 WHERE token = ?', [token]);
+  },
+};
