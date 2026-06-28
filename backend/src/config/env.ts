@@ -24,6 +24,10 @@ const schema = z.object({
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
   /** mock_nomba (default) | nomba — live Nomba only after hackathon build phase */
   PAYMENT_PROVIDER: z.enum(['mock_nomba', 'nomba']).default('mock_nomba'),
+  /** Log HTTP requests/responses to terminal (default: on in development) */
+  LOG_HTTP: z.enum(['true', 'false']).optional(),
+  /** basic | detailed | debug — verbosity of HTTP logs */
+  LOG_HTTP_LEVEL: z.enum(['basic', 'detailed', 'debug']).optional(),
   NOMBA_BASE_URL: z.string().url().optional(),
   NOMBA_API_KEY: z.string().optional(),
   NOMBA_ACCOUNT_ID: z.string().optional(),

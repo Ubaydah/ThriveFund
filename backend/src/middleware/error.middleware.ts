@@ -4,11 +4,15 @@ import { AppError } from '../lib/errors';
 
 export const errorHandler = (
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ) => {
   if (err instanceof AppError) {
+    if (req.requestId) {
+      console.log(`[${new Date().toISOString().slice(11, 23)}] ⚠ ERROR ${req.requestId}  ${err.statusCode} ${err.code}  ${err.message}`);
+      if (err.details) console.log('  details  ', JSON.stringify(err.details));
+    }
     return res.status(err.statusCode).json({
       success: false,
       error: {
@@ -20,6 +24,10 @@ export const errorHandler = (
   }
 
   if (err instanceof ZodError) {
+    if (req.requestId) {
+      console.log(`[${new Date().toISOString().slice(11, 23)}] ⚠ VALIDATION ${req.requestId}  ${err.errors.length} field(s)`);
+      err.errors.forEach((e) => console.log(`    · ${e.path.join('.')}: ${e.message}`));
+    }
     return res.status(400).json({
       success: false,
       error: {
@@ -30,7 +38,7 @@ export const errorHandler = (
     });
   }
 
-  console.error('Unhandled error:', err);
+  console.error(`Unhandled error${req.requestId ? ` [${req.requestId}]` : ''}:`, err);
   return res.status(500).json({
     success: false,
     error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
