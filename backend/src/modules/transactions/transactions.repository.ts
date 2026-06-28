@@ -75,13 +75,19 @@ export const transactionsRepository = {
     provider_reference: string;
     status: string;
     paid_at: string;
+    organization_id?: string | null;
+    payment_id?: string;
+    reconciliation_id?: string;
   }) {
     await execute(
       `INSERT INTO transactions
-         (id, goal_id, virtual_account_id, contributor_name, amount, reference, provider_reference, status, paid_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [data.id, data.goal_id, data.virtual_account_id, data.contributor_name,
-       data.amount, data.reference, data.provider_reference, data.status, data.paid_at],
+         (id, goal_id, organization_id, virtual_account_id, payment_id, reconciliation_id,
+          contributor_name, amount, reference, provider_reference, status, paid_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.id, data.goal_id, data.organization_id ?? null, data.virtual_account_id,
+       data.payment_id ?? null, data.reconciliation_id ?? null,
+       data.contributor_name, data.amount, data.reference, data.provider_reference,
+       data.status, data.paid_at],
     );
   },
 

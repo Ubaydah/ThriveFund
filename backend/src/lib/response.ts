@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 
-export const ok = (res: Response, data: unknown, meta?: Record<string, unknown>) =>
+export const ok = (res: Response, data: unknown, meta?: Record<string, unknown> | object) =>
   res.json({ success: true, data, ...(meta && { meta }) });
 
 export const created = (res: Response, data: unknown) =>

@@ -1,37 +1,36 @@
 # Webhooks Module
 
-Receives and processes Nomba payment webhook events. This is a **core MVP endpoint**.
+Receives and validates payment webhook events. **Does not** create transactions directly — delegates to payments and reconciliation modules.
 
 ## Endpoints
 
-| Method | Path | Auth | Status |
-|--------|------|------|--------|
-| POST   | `/api/webhooks/nomba` | Nomba signature | ⬜ TODO |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/webhooks/nomba` | Signature | Receive Nomba/mock payment webhook |
+| POST | `/api/webhooks/mock/simulate` | None (dev only) | Simulate mock payment for demo |
 
-> Note: mounted at `/api/webhooks` (no `/v1` prefix) — Nomba needs a stable, non-versioned URL.
+## Mock Simulation (Development)
+
+```bash
+curl -X POST http://localhost:3001/api/webhooks/mock/simulate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account_number": "<from virtual account creation>",
+    "amount": 50000,
+    "payer_name": "Babatunde Adeyemi"
+  }'
+```
+
+Disabled in `NODE_ENV=production`.
 
 ## Processing Pipeline
 
-```
-1. Validate Nomba HMAC signature (header: x-nomba-signature)
-2. Store raw payload → webhook_events (processed = false)
-3. Idempotency check on provider_reference — return 200 if already processed
-4. Match account_number → virtual_accounts
-5. Create transaction record
-6. Update goal.current_amount (successful payments only)
-7. Mark webhook_event.processed = true
-8. Create notification for goal owner
-```
+1. Validate signature (via PaymentProvider)
+2. Store raw payload in `webhook_events`
+3. Idempotency check on `provider_reference`
+4. Call `paymentsService.ingestFromWebhook()`
+5. Call `reconciliationService.reconcilePayment()`
 
-## Signature Verification
+## Webhook Event Statuses
 
-Set `NOMBA_WEBHOOK_SECRET` in `.env`. Verification uses HMAC-SHA256 of the raw JSON body.
-Without the secret set (dev/local), verification is skipped.
-
-## Unmatched Webhooks
-
-If no virtual account is found for the incoming `account_number`, the webhook is stored with `processed = false` and surfaced in `GET /api/v1/admin/reconciliation`.
-
-## Requires DB Tables
-
-`webhook_events`, `virtual_accounts`, `transactions`, `goals`, `notifications`.
+`received`, `processed`, `failed`, `duplicate`

@@ -5,6 +5,7 @@ import { goalsController } from './goals.controller';
 import { virtualAccountsController } from '../virtual-accounts/virtual-accounts.controller';
 import { transactionsController } from '../transactions/transactions.controller';
 import { contributorsController } from '../contributors/contributors.controller';
+import { invitationsController } from '../invitations/invitations.controller';
 
 export const goalsRouter = Router();
 
@@ -30,6 +31,6 @@ goalsRouter.get('/:id/transactions', transactionsController.getByGoal);
 goalsRouter.get('/:id/contributors', contributorsController.getByGoal);
 goalsRouter.post('/:id/contributors', contributorsController.addToGoal);
 
-// Invitations (nested under contributors module)
-goalsRouter.post('/:id/invitations', contributorsController.sendInvitation);
-goalsRouter.get('/:id/invitations', contributorsController.getInvitations);
+// Invitations (nested — delegated to invitations module)
+goalsRouter.post('/:id/invitations', invitationsController.sendToGoal);
+goalsRouter.get('/:id/invitations', invitationsController.listByGoal);

@@ -7,6 +7,7 @@ Save, collect, and reconcile payments effortlessly — a React web app for Niger
 ```
 ThriveFund/
 ├── docs/        # Architecture & API documentation
+├── backend/     # Node.js + Express + TypeScript (modular monolith)
 └── frontend/    # React + Vite + TypeScript + Tailwind
 ```
 
@@ -21,6 +22,8 @@ See the [docs/](./docs/) folder for:
 
 ## Getting Started
 
+### Frontend
+
 ```bash
 cd frontend
 npm install
@@ -28,6 +31,21 @@ npm run dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173).
+
+### Backend
+
+```bash
+cd backend
+npm install
+cp .env.example .env
+mysql ... < database/schema.sql
+mysql ... < database/seed.sql
+npm run dev
+```
+
+API runs at [http://localhost:3001/api/v1](http://localhost:3001/api/v1).
+
+See [backend/README.md](./backend/README.md) for mock payment demo flow.
 
 ## Build
 

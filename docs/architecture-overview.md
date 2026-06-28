@@ -81,11 +81,13 @@ ThriveFund helps individuals, communities, schools, small businesses, and cooper
 | Layer | Choice |
 |-------|--------|
 | Frontend | React + Tailwind CSS |
-| Backend | Django REST Framework or Spring Boot |
-| Database | PostgreSQL |
+| Backend | Node.js + TypeScript + Express (modular monolith) |
+| Database | MySQL 8 (AWS RDS) |
 | Auth | JWT |
-| API docs | Swagger / OpenAPI |
-| Hosting | Render, Railway, or GCP Cloud Run |
+| Email | Brevo |
+| Payments | PaymentProvider abstraction (MockNomba → Nomba on July 1) |
+| Hosting | AWS EC2 |
+| API docs | OpenAPI / Postman collection |
 
 ## Reconciliation Rules
 

@@ -22,6 +22,8 @@ const schema = z.object({
   BREVO_SENDER_EMAIL: z.string().email(),
   BREVO_SENDER_NAME: z.string().default('ThriveFund'),
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  /** mock_nomba (default) | nomba — live Nomba only after hackathon build phase */
+  PAYMENT_PROVIDER: z.enum(['mock_nomba', 'nomba']).default('mock_nomba'),
   NOMBA_BASE_URL: z.string().url().optional(),
   NOMBA_API_KEY: z.string().optional(),
   NOMBA_ACCOUNT_ID: z.string().optional(),

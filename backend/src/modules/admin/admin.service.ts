@@ -1,56 +1,49 @@
 import { Errors } from '../../lib/errors';
 import { adminRepository } from './admin.repository';
 import { webhooksRepository } from '../webhooks/webhooks.repository';
+import { reconciliationService } from '../reconciliation/reconciliation.service';
+import { resolveReconciliationSchema, type ResolveReconciliationDto } from '../reconciliation/reconciliation.validators';
+import { webhooksService } from '../webhooks/webhooks.service';
 
 export const adminService = {
   async overview() {
-    return adminRepository.getPlatformStats();
+    const stats = await adminRepository.getPlatformStats();
+    const reconciliation = await reconciliationService.overview();
+    return { ...stats, reconciliation };
   },
 
   async listReconciliation(query: { status?: string; from?: string; to?: string; page?: number; per_page?: number }) {
-    const page = query.page ?? 1;
-    const perPage = Math.min(query.per_page ?? 20, 100);
-    const { rows, total } = await webhooksRepository.findReconciliation({
-      status: query.status,
-      from:   query.from,
-      to:     query.to,
-      page,
-      perPage,
-    });
-    return { data: rows, meta: { page, per_page: perPage, total } };
+    return reconciliationService.listAdmin(query);
   },
 
   async getReconciliation(id: string) {
-    const event = await webhooksRepository.findById(id);
-    if (!event) throw Errors.notFound('Webhook event');
-    return event;
+    return reconciliationService.getById(id);
   },
 
-  async resolveReconciliation(id: string, body: { goal_id: string; action: string; notes?: string }) {
-    const event = await webhooksRepository.findById(id);
-    if (!event) throw Errors.notFound('Webhook event');
-
-    // TODO: implement full manual match — create transaction against body.goal_id
-    await webhooksRepository.markReconciledManually(id);
-    return { resolved: true, notes: body.notes };
+  async resolveReconciliation(id: string, body: ResolveReconciliationDto) {
+    const parsed = resolveReconciliationSchema.parse(body);
+    return reconciliationService.resolveManual(id, parsed);
   },
 
   async listWebhookEvents(query: { processed?: string; event_type?: string; page?: number; per_page?: number }) {
     const page = query.page ?? 1;
     const perPage = Math.min(query.per_page ?? 20, 100);
-    return webhooksRepository.findAll({
-      processed:  query.processed !== undefined ? query.processed === 'true' : undefined,
+    const rows = await webhooksRepository.findAll({
+      processed: query.processed !== undefined ? query.processed === 'true' : undefined,
       event_type: query.event_type,
       page,
       perPage,
     });
+    return rows;
   },
 
   async retryWebhookEvent(id: string) {
     const event = await webhooksRepository.findById(id);
     if (!event) throw Errors.notFound('Webhook event');
-    // TODO: re-enqueue event for processing (e.g. push to a job queue)
-    return { queued: true };
+    const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+    const signature = '';
+    const rawBody = typeof event.payload === 'string' ? event.payload : JSON.stringify(event.payload);
+    return webhooksService.processNomba(rawBody, signature, payload);
   },
 
   async listUsers(query: { page?: number; per_page?: number }) {

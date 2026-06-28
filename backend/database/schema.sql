@@ -1,5 +1,9 @@
 -- ThriveFund Database Schema — MySQL 8.0
--- Run once: mysql -h <host> -u admin -p thrivefund < database/schema.sql
+-- Modular monolith · Payment operations platform
+-- Run: mysql -h <host> -u admin -p thrivefund < database/schema.sql
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- USERS
@@ -15,6 +19,45 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at    DATETIME      NULL     ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_email (email)
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ORGANIZATIONS
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS organizations (
+  id          VARCHAR(36)   NOT NULL,
+  name        VARCHAR(255)  NOT NULL,
+  slug        VARCHAR(255)  NOT NULL,
+  type        ENUM('school','mosque','church','cooperative','association','ngo','business','event','other') NOT NULL DEFAULT 'other',
+  description TEXT          NULL,
+  email       VARCHAR(255)  NULL,
+  phone       VARCHAR(20)   NULL,
+  address     VARCHAR(500)  NULL,
+  owner_id    VARCHAR(36)   NOT NULL,
+  created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME      NULL     ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_organizations_slug (slug),
+  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE RESTRICT,
+  INDEX idx_organizations_type (type),
+  INDEX idx_organizations_owner (owner_id)
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ORGANIZATION MEMBERS
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS organization_members (
+  id              VARCHAR(36) NOT NULL,
+  organization_id VARCHAR(36) NOT NULL,
+  user_id         VARCHAR(36) NOT NULL,
+  role            ENUM('owner','admin','treasurer','viewer') NOT NULL DEFAULT 'viewer',
+  invited_by      VARCHAR(36) NULL,
+  joined_at       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_org_members (organization_id, user_id),
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_org_members_user (user_id)
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -57,11 +100,12 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- GOALS
+-- GOALS / CAMPAIGNS
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS goals (
   id              VARCHAR(36)    NOT NULL,
   user_id         VARCHAR(36)    NOT NULL,
+  organization_id VARCHAR(36)    NULL,
   title           VARCHAR(255)   NOT NULL,
   description     TEXT           NULL,
   target_amount   DECIMAL(15,2)  NOT NULL,
@@ -77,7 +121,9 @@ CREATE TABLE IF NOT EXISTS goals (
   PRIMARY KEY (id),
   UNIQUE KEY uq_goals_slug (slug),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL,
   INDEX idx_goals_user_status (user_id, status),
+  INDEX idx_goals_org (organization_id),
   INDEX idx_goals_category (category)
 );
 
@@ -87,39 +133,118 @@ CREATE TABLE IF NOT EXISTS goals (
 CREATE TABLE IF NOT EXISTS virtual_accounts (
   id                 VARCHAR(36)  NOT NULL,
   goal_id            VARCHAR(36)  NOT NULL,
-  nomba_account_id   VARCHAR(255) NOT NULL,
+  organization_id    VARCHAR(36)  NULL,
+  provider           ENUM('mock_nomba','nomba') NOT NULL DEFAULT 'mock_nomba',
+  provider_account_id VARCHAR(255) NOT NULL,
   account_number     VARCHAR(20)  NOT NULL,
   account_name       VARCHAR(255) NOT NULL,
   bank_name          VARCHAR(255) NOT NULL,
   provider_reference VARCHAR(255) NOT NULL,
-  status             ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  status             ENUM('active','inactive','pending') NOT NULL DEFAULT 'active',
   created_at         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_virtual_accounts_number (account_number),
   UNIQUE KEY uq_virtual_accounts_provider_ref (provider_reference),
   FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL,
   INDEX idx_virtual_accounts_goal (goal_id)
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- TRANSACTIONS
+-- WEBHOOK EVENTS (raw ingestion — processed by payments/reconciliation)
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS webhook_events (
+  id                 VARCHAR(36)  NOT NULL,
+  provider           ENUM('mock_nomba','nomba') NOT NULL DEFAULT 'mock_nomba',
+  event_type         VARCHAR(100) NOT NULL,
+  provider_reference VARCHAR(255) NOT NULL,
+  payload            JSON         NOT NULL,
+  status             ENUM('received','processed','failed','duplicate') NOT NULL DEFAULT 'received',
+  processed          TINYINT(1)   NOT NULL DEFAULT 0,
+  processed_at       DATETIME     NULL,
+  error_message      TEXT         NULL,
+  received_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_webhook_events_provider_ref (provider_reference),
+  INDEX idx_webhook_events_status (status),
+  INDEX idx_webhook_events_processed (processed)
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PAYMENTS (verified incoming payments from provider)
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS payments (
+  id                 VARCHAR(36)    NOT NULL,
+  webhook_event_id   VARCHAR(36)    NULL,
+  provider           ENUM('mock_nomba','nomba') NOT NULL DEFAULT 'mock_nomba',
+  provider_reference VARCHAR(255)   NOT NULL,
+  account_number     VARCHAR(20)    NOT NULL,
+  amount             DECIMAL(15,2)  NOT NULL,
+  currency           VARCHAR(3)     NOT NULL DEFAULT 'NGN',
+  payer_name         VARCHAR(255)   NOT NULL DEFAULT 'Anonymous',
+  reference          VARCHAR(255)   NOT NULL,
+  status             ENUM('received','verified','rejected','duplicate') NOT NULL DEFAULT 'received',
+  paid_at            DATETIME       NULL,
+  verified_at        DATETIME       NULL,
+  created_at         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_payments_provider_ref (provider_reference),
+  FOREIGN KEY (webhook_event_id) REFERENCES webhook_events(id) ON DELETE SET NULL,
+  INDEX idx_payments_account (account_number),
+  INDEX idx_payments_status (status)
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- RECONCILIATION RECORDS
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS reconciliation_records (
+  id                 VARCHAR(36) NOT NULL,
+  payment_id         VARCHAR(36) NOT NULL,
+  webhook_event_id   VARCHAR(36) NULL,
+  organization_id    VARCHAR(36) NULL,
+  goal_id            VARCHAR(36) NULL,
+  virtual_account_id VARCHAR(36) NULL,
+  transaction_id     VARCHAR(36) NULL,
+  status             ENUM('matched','unmatched','manual','failed','pending') NOT NULL DEFAULT 'pending',
+  notes              TEXT        NULL,
+  processed_at       DATETIME    NULL,
+  created_at         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,
+  FOREIGN KEY (webhook_event_id) REFERENCES webhook_events(id) ON DELETE SET NULL,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL,
+  FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE SET NULL,
+  FOREIGN KEY (virtual_account_id) REFERENCES virtual_accounts(id) ON DELETE SET NULL,
+  INDEX idx_reconciliation_status (status),
+  INDEX idx_reconciliation_goal (goal_id)
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TRANSACTIONS (immutable payment records)
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS transactions (
   id                 VARCHAR(36)    NOT NULL,
   goal_id            VARCHAR(36)    NOT NULL,
+  organization_id    VARCHAR(36)    NULL,
   virtual_account_id VARCHAR(36)    NOT NULL,
+  payment_id         VARCHAR(36)    NULL,
+  reconciliation_id  VARCHAR(36)    NULL,
   contributor_name   VARCHAR(255)   NOT NULL,
   amount             DECIMAL(15,2)  NOT NULL,
   reference          VARCHAR(255)   NOT NULL,
   provider_reference VARCHAR(255)   NOT NULL,
-  status             ENUM('pending','successful','failed') NOT NULL DEFAULT 'pending',
+  status             ENUM('pending','successful','failed','duplicate','pending_review') NOT NULL DEFAULT 'pending',
   paid_at            DATETIME       NULL,
   created_at         DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_transactions_provider_ref (provider_reference),
   FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL,
   FOREIGN KEY (virtual_account_id) REFERENCES virtual_accounts(id),
+  FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE SET NULL,
+  FOREIGN KEY (reconciliation_id) REFERENCES reconciliation_records(id) ON DELETE SET NULL,
   INDEX idx_transactions_goal_status (goal_id, status),
+  INDEX idx_transactions_org (organization_id),
   INDEX idx_transactions_paid_at (paid_at)
 );
 
@@ -129,30 +254,42 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE TABLE IF NOT EXISTS contributors (
   id               VARCHAR(36)  NOT NULL,
   goal_id          VARCHAR(36)  NOT NULL,
+  organization_id  VARCHAR(36)  NULL,
   name             VARCHAR(255) NOT NULL,
   email            VARCHAR(255) NULL,
   phone_number     VARCHAR(20)  NULL,
   unique_reference VARCHAR(255) NOT NULL,
+  total_contributed DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_contributors_reference (unique_reference),
-  FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE
+  FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- INVITATIONS
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS invitations (
-  id      VARCHAR(36)  NOT NULL,
-  goal_id VARCHAR(36)  NOT NULL,
-  email   VARCHAR(255) NOT NULL,
-  name    VARCHAR(255) NULL,
-  channel VARCHAR(50)  NOT NULL DEFAULT 'email',
-  status  ENUM('sent','accepted','declined') NOT NULL DEFAULT 'sent',
-  sent_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id              VARCHAR(36)  NOT NULL,
+  goal_id         VARCHAR(36)  NULL,
+  organization_id VARCHAR(36)  NULL,
+  invited_by      VARCHAR(36)  NOT NULL,
+  email           VARCHAR(255) NOT NULL,
+  name            VARCHAR(255) NULL,
+  role            VARCHAR(50)  NULL,
+  channel         VARCHAR(50)  NOT NULL DEFAULT 'email',
+  token           VARCHAR(255) NULL,
+  status          ENUM('sent','accepted','declined','expired') NOT NULL DEFAULT 'sent',
+  message         TEXT         NULL,
+  sent_at         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at      DATETIME     NULL,
   PRIMARY KEY (id),
   FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE,
-  INDEX idx_invitations_email (email)
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (invited_by) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_invitations_email (email),
+  INDEX idx_invitations_status (status)
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -172,18 +309,24 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- WEBHOOK EVENTS
+-- AUDIT LOGS
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS webhook_events (
-  id                 VARCHAR(36)  NOT NULL,
-  event_type         VARCHAR(100) NOT NULL,
-  provider_reference VARCHAR(255) NOT NULL,
-  payload            JSON         NOT NULL,
-  processed          TINYINT(1)   NOT NULL DEFAULT 0,
-  processed_at       DATETIME     NULL,
-  received_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id              VARCHAR(36)  NOT NULL,
+  action          VARCHAR(100) NOT NULL,
+  actor_id        VARCHAR(36)  NULL,
+  organization_id VARCHAR(36)  NULL,
+  resource_type   VARCHAR(100) NULL,
+  resource_id     VARCHAR(36)  NULL,
+  metadata        JSON         NULL,
+  ip_address      VARCHAR(45)  NULL,
+  created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_webhook_events_provider_ref (provider_reference),
-  INDEX idx_webhook_events_processed (processed),
-  INDEX idx_webhook_events_received_at (received_at)
+  FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL,
+  INDEX idx_audit_action (action),
+  INDEX idx_audit_actor (actor_id),
+  INDEX idx_audit_created (created_at)
 );
+
+SET FOREIGN_KEY_CHECKS = 1;

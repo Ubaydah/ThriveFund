@@ -9,10 +9,20 @@ export const virtualAccountsRepository = {
     return rows[0] ?? null;
   },
 
+  async findByGoalId(goalId: string) {
+    const rows = await query(
+      `SELECT * FROM virtual_accounts WHERE goal_id = ? AND status = 'active' LIMIT 1`,
+      [goalId],
+    );
+    return rows[0] ?? null;
+  },
+
   async insert(data: {
     id: string;
     goal_id: string;
-    nomba_account_id: string;
+    organization_id?: string | null;
+    provider: string;
+    provider_account_id: string;
     account_number: string;
     account_name: string;
     bank_name: string;
@@ -20,10 +30,12 @@ export const virtualAccountsRepository = {
   }) {
     await execute(
       `INSERT INTO virtual_accounts
-         (id, goal_id, nomba_account_id, account_number, account_name, bank_name, provider_reference, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'active', NOW())`,
-      [data.id, data.goal_id, data.nomba_account_id, data.account_number,
-       data.account_name, data.bank_name, data.provider_reference],
+         (id, goal_id, organization_id, provider, provider_account_id, account_number,
+          account_name, bank_name, provider_reference, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())`,
+      [data.id, data.goal_id, data.organization_id ?? null, data.provider,
+       data.provider_account_id, data.account_number, data.account_name,
+       data.bank_name, data.provider_reference],
     );
     const rows = await query('SELECT * FROM virtual_accounts WHERE id = ?', [data.id]);
     return rows[0];

@@ -1,12 +1,12 @@
-import crypto from 'crypto';
 import { v4 as uuid } from 'uuid';
-import { env } from '../../config/env';
+import { getPaymentProvider } from '../../providers/payment';
+import type { PaymentWebhookPayload } from '../../providers/payment';
 import { Errors } from '../../lib/errors';
+import { logAudit } from '../../lib/audit';
+import { AuditAction } from '../../shared/types/enums';
 import { webhooksRepository } from './webhooks.repository';
-import { virtualAccountsRepository } from '../virtual-accounts/virtual-accounts.repository';
-import { transactionsRepository } from '../transactions/transactions.repository';
-import { goalsRepository } from '../goals/goals.repository';
-import { notificationsRepository } from '../notifications/notifications.repository';
+import { paymentsService } from '../payments/payments.service';
+import { reconciliationService } from '../reconciliation/reconciliation.service';
 
 interface NombaPayload {
   event: string;
@@ -23,86 +23,111 @@ interface NombaPayload {
   };
 }
 
-function verifySignature(rawBody: string, signature: string): boolean {
-  if (!env.NOMBA_WEBHOOK_SECRET) return true; // skip in dev if not configured
-  const expected = crypto
-    .createHmac('sha256', env.NOMBA_WEBHOOK_SECRET)
-    .update(rawBody)
-    .digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-}
-
-function mapStatus(nombaStatus: string): string {
-  const s = nombaStatus.toLowerCase();
-  if (s === 'success' || s === 'successful' || s === 'completed') return 'successful';
-  if (s === 'pending') return 'pending';
-  return 'failed';
+function toProviderPayload(payload: NombaPayload): PaymentWebhookPayload {
+  return {
+    event: payload.event,
+    accountNumber: payload.data.account_number,
+    amount: payload.data.amount,
+    currency: payload.data.currency || 'NGN',
+    payerName: payload.data.payer_name,
+    reference: payload.data.reference,
+    providerReference: payload.data.provider_reference,
+    status: payload.data.status,
+    paidAt: payload.data.paid_at,
+    bankName: payload.data.bank_name,
+  };
 }
 
 export const webhooksService = {
+  /**
+   * Webhook ingestion only:
+   * 1. Validate signature
+   * 2. Store raw webhook_events
+   * 3. Delegate to payments → reconciliation
+   */
   async processNomba(rawBody: string, signature: string, payload: NombaPayload) {
-    // 1. Validate signature
-    if (!verifySignature(rawBody, signature)) {
+    const provider = getPaymentProvider();
+
+    if (!provider.validateWebhookSignature(rawBody, signature)) {
       throw Errors.unauthorized('Invalid webhook signature');
     }
 
-    // 2. Store raw payload (processed = false)
-    await webhooksRepository.insertEvent({
+    const event = await webhooksRepository.insertEvent({
       id: `wh_${uuid().replace(/-/g, '').slice(0, 12)}`,
       event_type: payload.event,
       provider_reference: payload.data.provider_reference,
       payload: rawBody,
     });
 
-    // 3. Idempotency — skip if already processed
-    const duplicate = await transactionsRepository.findByProviderReference(payload.data.provider_reference);
-    if (duplicate) return { received: true, duplicate: true };
-
-    // 4. Match account_number → VirtualAccount
-    const va = await virtualAccountsRepository.findByAccountNumber(payload.data.account_number);
-    if (!va) {
-      // Unmatched — leave webhook_event.processed = false for admin reconciliation
-      return { received: true, matched: false };
+    if (!event) {
+      return { received: true, duplicate: true };
     }
 
-    const status = mapStatus(payload.data.status);
-
-    // 5. Create Transaction
-    const txnId = `txn_${uuid().replace(/-/g, '').slice(0, 12)}`;
-    await transactionsRepository.insert({
-      id: txnId,
-      goal_id: va.goal_id,
-      virtual_account_id: va.id,
-      contributor_name: payload.data.payer_name ?? 'Anonymous',
-      amount: payload.data.amount,
-      reference: payload.data.reference,
-      provider_reference: payload.data.provider_reference,
-      status,
-      paid_at: payload.data.paid_at,
+    await logAudit({
+      action: AuditAction.WebhookReceived,
+      resource_type: 'webhook_event',
+      resource_id: event.id as string,
+      metadata: { provider_reference: payload.data.provider_reference },
     });
 
-    // 6. Update Goal.current_amount (successful payments only)
-    if (status === 'successful') {
-      await goalsRepository.incrementAmount(va.goal_id, payload.data.amount);
-    }
+    try {
+      const providerPayload = toProviderPayload(payload);
+      const { payment, duplicate } = await paymentsService.ingestFromWebhook(
+        event.id as string,
+        providerPayload,
+      );
 
-    // 7. Mark webhook processed
-    await webhooksRepository.markProcessed(payload.data.provider_reference);
-
-    // 8. Create in-app notification for goal owner
-    if (status === 'successful') {
-      const goal = await goalsRepository.findOwnerByGoalId(va.goal_id);
-      if (goal) {
-        await notificationsRepository.insert({
-          id: `ntf_${uuid().replace(/-/g, '').slice(0, 12)}`,
-          user_id: goal.user_id,
-          type: 'payment',
-          title: 'Payment received',
-          body: `${payload.data.payer_name ?? 'Someone'} contributed ₦${payload.data.amount.toLocaleString()} to ${goal.title}`,
-        });
+      if (duplicate) {
+        return { received: true, duplicate: true };
       }
-    }
 
-    return { received: true, matched: true, transaction_id: txnId };
+      const result = await reconciliationService.reconcilePayment({
+        id: payment.id as string,
+        webhook_event_id: event.id as string,
+        provider_reference: payment.provider_reference as string,
+        account_number: payment.account_number as string,
+        amount: Number(payment.amount),
+        payer_name: payment.payer_name as string,
+        reference: payment.reference as string,
+        status: payment.status as string,
+        paid_at: payment.paid_at as string | undefined,
+      });
+
+      return {
+        received: true,
+        matched: result.matched,
+        transaction_id: result.transaction_id,
+        reconciliation_id: (result.reconciliation as { id?: string })?.id,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Processing failed';
+      await webhooksRepository.markFailed(payload.data.provider_reference, message);
+      throw err;
+    }
+  },
+
+  /** Dev-only: simulate a mock payment webhook for demo/testing */
+  async simulateMockPayment(body: {
+    account_number: string;
+    amount: number;
+    payer_name?: string;
+    goal_reference?: string;
+  }) {
+    const providerRef = `MOCK-WH-${uuid().slice(0, 8).toUpperCase()}`;
+    const payload: NombaPayload = {
+      event: 'payment.received',
+      data: {
+        account_number: body.account_number,
+        amount: body.amount,
+        currency: 'NGN',
+        payer_name: body.payer_name ?? 'Mock Contributor',
+        reference: `REF-${Date.now()}`,
+        provider_reference: providerRef,
+        status: 'successful',
+        paid_at: new Date().toISOString(),
+        bank_name: 'First Bank',
+      },
+    };
+    return this.processNomba(JSON.stringify(payload), '', payload);
   },
 };

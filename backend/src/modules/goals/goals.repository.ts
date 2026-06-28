@@ -137,9 +137,11 @@ export const goalsRepository = {
     );
   },
 
-  async findOwnerByGoalId(goalId: string): Promise<{ user_id: string; title: string } | null> {
-    const rows = await query<{ user_id: string; title: string }>(
-      'SELECT user_id, title FROM goals WHERE id = ?',
+  async findOwnerByGoalId(goalId: string): Promise<{ user_id: string; title: string; email: string } | null> {
+    const rows = await query<{ user_id: string; title: string; email: string }>(
+      `SELECT g.user_id, g.title, u.email
+       FROM goals g JOIN users u ON u.id = g.user_id
+       WHERE g.id = ?`,
       [goalId],
     );
     return rows[0] ?? null;
