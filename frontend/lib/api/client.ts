@@ -1,65 +1,143 @@
-/**
- * API client stubs — wire to backend after July 1 hackathon build phase.
- * Set NEXT_PUBLIC_USE_MOCK_DATA=false to use live endpoints.
- */
+import type { ApiErrorResponse, ApiResponse, AuthTokens, PaginationMeta } from './types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
-
-export async function apiFetch<T>(
-  path: string,
-  options?: RequestInit
-): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  const json = await res.json();
-  return json.data as T;
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+    public details?: unknown,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
 }
 
-// Integration points — replace mock imports in pages with these when backend is ready
-export const api = {
-  organizations: {
-    list: () => apiFetch('/organizations'),
-    get: (id: string) => apiFetch(`/organizations/${id}`),
-    create: (body: unknown) => apiFetch('/organizations', { method: 'POST', body: JSON.stringify(body) }),
-  },
-  campaigns: {
-    list: () => apiFetch('/goals'),
-    get: (id: string) => apiFetch(`/goals/${id}`),
-    create: (body: unknown) => apiFetch('/goals', { method: 'POST', body: JSON.stringify(body) }),
-  },
-  virtualAccounts: {
-    list: () => apiFetch('/virtual-accounts'),
-    getByGoal: (goalId: string) => apiFetch(`/goals/${goalId}/virtual-account`),
-  },
-  transactions: {
-    list: (params?: Record<string, string>) => {
-      const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-      return apiFetch(`/transactions${qs}`);
-    },
-  },
-  reconciliation: {
-    overview: () => apiFetch('/reconciliation/overview'),
-    list: (params?: Record<string, string>) => {
-      const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-      return apiFetch(`/reconciliation${qs}`);
-    },
-  },
-  contributors: {
-    list: () => apiFetch('/contributors'),
-  },
-  reports: {
-    financialSummary: () => apiFetch('/reports/financial-summary'),
-  },
-  dashboard: {
-    overview: () => apiFetch('/dashboard/overview'),
-  },
-  admin: {
-    overview: () => apiFetch('/admin/overview'),
-  },
+const ACCESS_KEY = 'thrivefund_access_token';
+const REFRESH_KEY = 'thrivefund_refresh_token';
+
+export function getAccessToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(ACCESS_KEY);
+}
+
+export function getRefreshToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(REFRESH_KEY);
+}
+
+export function setTokens(tokens: AuthTokens) {
+  localStorage.setItem(ACCESS_KEY, tokens.access_token);
+  localStorage.setItem(REFRESH_KEY, tokens.refresh_token);
+}
+
+export function clearTokens() {
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
+}
+
+export const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api/v1';
+
+export const WEBHOOK_BASE =
+  process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL ?? 'http://localhost:3001/api/webhooks';
+
+type RequestOptions = RequestInit & {
+  params?: Record<string, string | number | boolean | undefined>;
+  skipAuth?: boolean;
 };
+
+function buildUrl(path: string, params?: RequestOptions['params']) {
+  const base = path.startsWith('http') ? path : `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
+  if (!params) return base;
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== '') qs.set(k, String(v));
+  });
+  const q = qs.toString();
+  return q ? `${base}?${q}` : base;
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refresh = getRefreshToken();
+  if (!refresh) return null;
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refresh }),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as ApiResponse<{ access_token: string; expires_in: number }>;
+    localStorage.setItem(ACCESS_KEY, json.data.access_token);
+    return json.data.access_token;
+  } catch {
+    return null;
+  }
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<{ data: T; meta?: PaginationMeta }> {
+  const { params, skipAuth, headers: customHeaders, ...init } = options;
+  const url = buildUrl(path, params);
+
+  const headers: Record<string, string> = {
+    ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(customHeaders as Record<string, string>),
+  };
+
+  if (!skipAuth) {
+    const token = getAccessToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+
+  let res = await fetch(url, { ...init, headers, credentials: 'include' });
+
+  if (res.status === 401 && !skipAuth) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      headers.Authorization = `Bearer ${newToken}`;
+      res = await fetch(url, { ...init, headers, credentials: 'include' });
+    }
+  }
+
+  if (res.status === 204) {
+    return { data: undefined as T };
+  }
+
+  const contentType = res.headers.get('content-type') ?? '';
+  if (contentType.includes('text/csv')) {
+    const text = await res.text();
+    return { data: text as T };
+  }
+
+  const json = await res.json();
+
+  if (!res.ok) {
+    const err = json as ApiErrorResponse;
+    throw new ApiError(
+      res.status,
+      err.error?.code ?? 'UNKNOWN',
+      err.error?.message ?? 'Request failed',
+      err.error?.details,
+    );
+  }
+
+  const ok = json as ApiResponse<T>;
+  return { data: ok.data, meta: ok.meta };
+}
+
+export async function webhookRequest<T>(path: string, body: unknown): Promise<T> {
+  const url = `${WEBHOOK_BASE}${path}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new ApiError(res.status, 'WEBHOOK_ERROR', json.error?.message ?? 'Webhook failed');
+  }
+  return json as T;
+}

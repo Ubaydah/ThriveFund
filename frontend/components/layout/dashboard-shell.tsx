@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Building2,
@@ -16,10 +16,16 @@ import {
   PanelLeftClose,
   PanelLeft,
   LogOut,
+  Bell,
+  BarChart3,
+  Settings,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { cn, getInitials } from '@/lib/utils';
+import { useEffect, useState } from 'react';
 import { MockDataBanner } from '@/components/shared/mock-banner';
+import { useAuth } from '@/contexts/auth-context';
+import { LoadingState } from '@/components/shared/query-states';
+import { useUnreadCount } from '@/hooks/use-api';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
@@ -31,12 +37,34 @@ const navItems = [
   { href: '/dashboard/contributors', label: 'Contributors', icon: Users },
   { href: '/dashboard/reports', label: 'Reports', icon: FileText },
   { href: '/dashboard/invitations', label: 'Invitations', icon: Mail },
+  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   { href: '/admin', label: 'Admin', icon: Shield },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading, logout } = useAuth();
   const [open, setOpen] = useState(true);
+  const { data: unread } = useUnreadCount();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC]">
+        <LoadingState message="Checking session..." />
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
@@ -45,7 +73,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <aside
         className={cn(
           'fixed left-0 top-0 z-30 flex h-full flex-col overflow-hidden bg-thrive-dark transition-all duration-300',
-          open ? 'w-64' : 'w-0 lg:w-16'
+          open ? 'w-64' : 'w-0 lg:w-16',
         )}
       >
         <div className="flex items-center gap-3 border-b border-white/10 px-4 py-5">
@@ -60,6 +88,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-4">
           {navItems.map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + '/');
+            const badge = href === '/dashboard/notifications' && unread?.count ? unread.count : null;
             return (
               <Link
                 key={href}
@@ -67,11 +96,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 onClick={() => window.innerWidth < 1024 && setOpen(false)}
                 className={cn(
                   'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all',
-                  active ? 'bg-primary text-white' : 'text-slate-400 hover:bg-white/10 hover:text-white'
+                  active ? 'bg-primary text-white' : 'text-slate-400 hover:bg-white/10 hover:text-white',
                 )}
               >
                 <Icon size={18} className="shrink-0" />
-                {open && <span className="font-medium">{label}</span>}
+                {open && (
+                  <>
+                    <span className="flex-1 font-medium">{label}</span>
+                    {badge ? (
+                      <span className="rounded-full bg-white/20 px-1.5 text-[10px] font-bold">{badge}</span>
+                    ) : null}
+                  </>
+                )}
               </Link>
             );
           })}
@@ -80,12 +116,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         {open && (
           <div className="border-t border-white/10 p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">AO</div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-white">Adebayo Okonkwo</p>
-                <p className="truncate text-xs text-slate-500">adebayo@thrivefund.ng</p>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
+                {getInitials(user.full_name)}
               </div>
-              <Link href="/" className="text-slate-500 hover:text-white"><LogOut size={15} /></Link>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-white">{user.full_name}</p>
+                <p className="truncate text-xs text-slate-500">{user.email}</p>
+              </div>
+              <button type="button" onClick={() => logout()} className="text-slate-500 hover:text-white">
+                <LogOut size={15} />
+              </button>
             </div>
           </div>
         )}
@@ -96,7 +136,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <button type="button" onClick={() => setOpen(!open)} className="text-slate-500 hover:text-thrive-dark">
             {open ? <PanelLeftClose size={20} /> : <PanelLeft size={20} />}
           </button>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">AO</div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-white">
+            {getInitials(user.full_name)}
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="mb-6"><MockDataBanner /></div>

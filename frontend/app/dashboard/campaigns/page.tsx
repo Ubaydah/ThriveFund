@@ -1,15 +1,25 @@
+'use client';
+
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { LoadingState, ErrorState, EmptyState } from '@/components/shared/query-states';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { campaigns, campaignTypeLabels } from '@/lib/mock-data';
-import { calcProgress, formatNaira } from '@/lib/utils';
+import { useGoals } from '@/hooks/use-api';
+import { formatNaira } from '@/lib/utils';
+import { getAuthErrorMessage } from '@/contexts/auth-context';
 
 export default function CampaignsPage() {
+  const { data, isLoading, error, refetch } = useGoals();
+  const campaigns = data?.data ?? [];
+
+  if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState message={getAuthErrorMessage(error)} onRetry={() => refetch()} />;
+
   return (
     <div>
       <PageHeader
@@ -18,32 +28,37 @@ export default function CampaignsPage() {
         action={<Button asChild><Link href="/dashboard/campaigns/new"><Plus className="h-4 w-4" /> New Campaign</Link></Button>}
       />
 
-      <div className="space-y-4">
-        {campaigns.map((c) => (
-          <Card key={c.id}>
-            <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <Link href={`/dashboard/campaigns/${c.id}`} className="text-lg font-semibold text-thrive-dark hover:text-primary">
-                    {c.name}
-                  </Link>
-                  <StatusBadge status={c.status} />
-                  <Badge variant="outline">{campaignTypeLabels[c.type]}</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">{c.organizationName} · {c.contributors} contributors · {c.daysLeft > 0 ? `${c.daysLeft} days left` : 'Completed'}</p>
-                <div className="mt-3 max-w-md">
-                  <Progress value={calcProgress(c.raised, c.target)} />
-                  <p className="mt-1 text-sm text-muted-foreground">{formatNaira(c.raised)} of {formatNaira(c.target)} ({calcProgress(c.raised, c.target)}%)</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" asChild><Link href={`/c/${c.slug}`}>Public Page</Link></Button>
-                <Button size="sm" asChild><Link href={`/dashboard/campaigns/${c.id}`}>Details</Link></Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {!campaigns.length ? (
+        <EmptyState title="No campaigns yet" description="Create a campaign and assign a mock virtual account." />
+      ) : (
+        <div className="space-y-4">
+          {campaigns.map((c) => {
+            const progress = Number(c.progress_percent ?? 0);
+            return (
+              <Card key={c.id}>
+                <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Link href={`/dashboard/campaigns/${c.id}`} className="text-lg font-semibold hover:text-primary">{c.title}</Link>
+                      <StatusBadge status={c.status} />
+                      <Badge variant="outline">{c.category}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{c.contributors_count ?? 0} contributors · {c.days_left ?? 0} days left</p>
+                    <div className="mt-3 max-w-md">
+                      <Progress value={progress} />
+                      <p className="mt-1 text-sm text-muted-foreground">{formatNaira(Number(c.current_amount))} of {formatNaira(Number(c.target_amount))} ({progress}%)</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {c.slug && <Button variant="outline" size="sm" asChild><Link href={`/c/${c.slug}`}>Public Page</Link></Button>}
+                    <Button size="sm" asChild><Link href={`/dashboard/campaigns/${c.id}`}>Details</Link></Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

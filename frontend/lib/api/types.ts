@@ -1,0 +1,224 @@
+/** Backend API response shapes (snake_case from DB) */
+
+export interface ApiResponse<T> {
+  success: true;
+  data: T;
+  meta?: PaginationMeta;
+}
+
+export interface ApiErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
+
+export interface PaginationMeta {
+  page: number;
+  per_page: number;
+  total: number;
+}
+
+export interface AuthTokens {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}
+
+export interface User {
+  id: string;
+  full_name: string;
+  email: string;
+  phone_number?: string | null;
+  role: 'user' | 'admin';
+  created_at?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  description?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  owner_id: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Goal {
+  id: string;
+  user_id: string;
+  organization_id?: string | null;
+  title: string;
+  description?: string | null;
+  target_amount: number;
+  current_amount: number;
+  category: string;
+  status: string;
+  deadline?: string | null;
+  slug?: string | null;
+  color?: string | null;
+  days_left?: number;
+  progress_percent?: number;
+  contributors_count?: number;
+  remaining_amount?: number;
+  created_at?: string;
+  virtual_account?: VirtualAccount | null;
+}
+
+export interface VirtualAccount {
+  id: string;
+  goal_id: string;
+  provider: string;
+  provider_account_id?: string;
+  account_number: string;
+  account_name: string;
+  bank_name: string;
+  provider_reference?: string;
+  status?: string;
+  goal_title?: string;
+  created_at?: string;
+}
+
+export interface Transaction {
+  id: string;
+  goal_id: string;
+  contributor_name: string;
+  amount: number;
+  reference: string;
+  provider_reference?: string;
+  status: string;
+  paid_at?: string;
+  goal_title?: string;
+  organization_name?: string;
+  reconciliation_status?: string;
+}
+
+export interface Contributor {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone_number?: string | null;
+  goals_count?: number;
+  total_contributed?: number;
+  last_contribution_at?: string | null;
+  avatar_initials?: string;
+}
+
+export interface ReconciliationRecord {
+  id: string;
+  payment_id?: string;
+  status: string;
+  amount?: number;
+  payer_name?: string;
+  reference?: string;
+  provider_reference?: string;
+  goal_title?: string;
+  organization_name?: string;
+  notes?: string;
+  created_at?: string;
+  processed_at?: string | null;
+}
+
+export interface ReconciliationOverview {
+  matched: number;
+  unmatched: number;
+  manual: number;
+  failed: number;
+  pending: number;
+  auto_match_rate: string;
+}
+
+export interface DashboardOverview {
+  total_saved: number;
+  active_goals: number;
+  contributors_count: number;
+  this_month_amount: number;
+  recent_transactions: Transaction[];
+  recent_goals: Goal[];
+}
+
+export interface FinancialSummary {
+  total_goals: number;
+  active_goals: number;
+  total_collected: number;
+  total_target: number;
+  total_transactions: number;
+  total_contributors: number;
+}
+
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  read: boolean;
+  created_at: string;
+}
+
+export interface Invitation {
+  id: string;
+  goal_id: string;
+  email: string;
+  name?: string | null;
+  channel: string;
+  status: string;
+  created_at?: string;
+}
+
+export interface ShareLink {
+  public_url: string;
+  slug: string;
+  qr_code_url: string;
+}
+
+export interface AdminOverview {
+  total_users: number;
+  total_goals: number;
+  total_transactions: number;
+  total_volume_ngn?: number;
+  pending_reconciliation?: number;
+  reconciliation: ReconciliationOverview;
+}
+
+export interface MonthlyContribution {
+  month: string;
+  amount: number;
+}
+
+export interface CategoryBreakdown {
+  category: string;
+  total: number;
+  percentage?: number;
+}
+
+export interface TopContributor {
+  contributor_name: string;
+  total: number;
+  goals_count?: number;
+}
+
+export interface GoalPerformance {
+  id: string;
+  title: string;
+  target_amount: number;
+  current_amount: number;
+  progress_percent: number;
+  status: string;
+}
+
+export interface PublicGoal extends Goal {
+  organization_name?: string;
+}
+
+export interface MockSimulateResult {
+  simulated: boolean;
+  received: boolean;
+  matched?: boolean;
+  duplicate?: boolean;
+}

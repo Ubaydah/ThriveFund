@@ -2,97 +2,135 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Copy, QrCode, Share2, ArrowLeft } from 'lucide-react';
+import { Copy, QrCode, Share2, ArrowLeft, Zap } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { LoadingState, ErrorState } from '@/components/shared/query-states';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
-  getCampaignById,
-  getContributorsByCampaignId,
-  getTransactionsByCampaignId,
-  getVirtualAccountByCampaignId,
-  campaignTypeLabels,
-} from '@/lib/mock-data';
-import { calcProgress, formatNaira, getInitials } from '@/lib/utils';
+  useGoal,
+  useGoalVirtualAccount,
+  useGoalTransactions,
+  useGoalContributors,
+  useGoalShare,
+  useCreateVirtualAccount,
+  useSimulatePayment,
+} from '@/hooks/use-api';
+import { formatNaira, getInitials } from '@/lib/utils';
+import { getAuthErrorMessage } from '@/contexts/auth-context';
 
 export default function CampaignDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const campaign = getCampaignById(id);
-  if (!campaign) {
-    return (
-      <div className="py-20 text-center">
-        <p className="text-muted-foreground">Campaign not found</p>
-        <Button className="mt-4" asChild><Link href="/dashboard/campaigns">Back to Campaigns</Link></Button>
-      </div>
-    );
-  }
+  const { data: campaign, isLoading, error, refetch } = useGoal(id);
+  const { data: va, refetch: refetchVa } = useGoalVirtualAccount(id);
+  const { data: txns } = useGoalTransactions(id);
+  const { data: members } = useGoalContributors(id);
+  const { data: share } = useGoalShare(id);
+  const createVa = useCreateVirtualAccount();
+  const simulate = useSimulatePayment();
 
-  const va = getVirtualAccountByCampaignId(campaign.id);
-  const txns = getTransactionsByCampaignId(campaign.id);
-  const members = getContributorsByCampaignId(campaign.id);
+  if (isLoading) return <LoadingState />;
+  if (error && !campaign) return <ErrorState message={getAuthErrorMessage(error)} onRetry={() => refetch()} />;
+  if (!campaign) return null;
 
-  const copyAccount = () => {
-    if (va) navigator.clipboard.writeText(va.accountNumber);
+  const progress = Number(campaign.progress_percent ?? 0);
+  const publicUrl = share?.public_url ?? (campaign.slug ? `${typeof window !== 'undefined' ? window.location.origin : ''}/c/${campaign.slug}` : '');
+
+  const handleCreateVa = async () => {
+    try {
+      await createVa.mutateAsync(id);
+      toast.success('Mock virtual account created');
+      refetchVa();
+    } catch (err) {
+      toast.error(getAuthErrorMessage(err));
+    }
+  };
+
+  const handleSimulate = async () => {
+    if (!va?.account_number) {
+      toast.error('Create a virtual account first');
+      return;
+    }
+    try {
+      await simulate.mutateAsync({ account_number: va.account_number, amount: 50000, payer_name: 'Test Payer' });
+      toast.success('Mock payment simulated and reconciled');
+      refetch();
+    } catch (err) {
+      toast.error(getAuthErrorMessage(err));
+    }
   };
 
   return (
     <div>
       <Button variant="ghost" size="sm" className="mb-4" asChild>
-        <Link href="/dashboard/campaigns"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Campaigns</Link>
+        <Link href="/dashboard/campaigns"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
       </Button>
 
       <PageHeader
-        title={campaign.name}
-        description={`${campaign.organizationName} · ${campaignTypeLabels[campaign.type]}`}
+        title={campaign.title}
+        description={`${campaign.category} · ${campaign.status}`}
         action={
           <div className="flex gap-2">
-            <Button variant="outline" asChild><Link href={`/c/${campaign.slug}`}><Share2 className="h-4 w-4" /> Share</Link></Button>
-            <Button asChild><Link href="/dashboard/invitations">Invite Contributors</Link></Button>
+            <Button variant="outline" onClick={handleSimulate} disabled={simulate.isPending || !va}>
+              <Zap className="h-4 w-4" /> Simulate Payment
+            </Button>
+            {campaign.slug && <Button variant="outline" asChild><Link href={`/c/${campaign.slug}`}><Share2 className="h-4 w-4" /> Public</Link></Button>}
           </div>
         }
       />
 
       <div className="mb-8 grid gap-4 sm:grid-cols-4">
-        <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Collected</p><p className="text-2xl font-bold">{formatNaira(campaign.raised)}</p></CardContent></Card>
-        <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Target</p><p className="text-2xl font-bold">{formatNaira(campaign.target)}</p></CardContent></Card>
-        <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Contributors</p><p className="text-2xl font-bold">{campaign.contributors}</p></CardContent></Card>
-        <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Progress</p><p className="text-2xl font-bold text-primary">{calcProgress(campaign.raised, campaign.target)}%</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Collected</p><p className="text-2xl font-bold">{formatNaira(Number(campaign.current_amount))}</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Target</p><p className="text-2xl font-bold">{formatNaira(Number(campaign.target_amount))}</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Contributors</p><p className="text-2xl font-bold">{campaign.contributors_count ?? 0}</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-sm text-muted-foreground">Progress</p><p className="text-2xl font-bold text-primary">{progress}%</p></CardContent></Card>
       </div>
 
-      <div className="mb-8"><Progress value={calcProgress(campaign.raised, campaign.target)} className="h-3" /></div>
+      <div className="mb-8"><Progress value={progress} className="h-3" /></div>
 
       <div className="mb-8 grid gap-6 lg:grid-cols-2">
-        {va && (
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2">Mock Virtual Account <StatusBadge status={va.status} /></CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-5">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Account Number</p>
-                <p className="text-2xl font-bold tracking-wider text-thrive-dark">{va.accountNumber}</p>
-                <p className="mt-2 text-sm">{va.bankName} · {va.accountName}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={copyAccount}><Copy className="h-4 w-4" /> Copy Number</Button>
-                <Button variant="outline" onClick={() => navigator.clipboard.writeText(campaign.shareLink)}><Share2 className="h-4 w-4" /> Copy Link</Button>
-              </div>
-              <p className="text-xs text-amber-700">Mock account — live Nomba VA provisioning from July 1</p>
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardHeader><CardTitle>Mock Virtual Account</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {va ? (
+              <>
+                <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-5">
+                  <p className="text-xs uppercase text-muted-foreground">Account Number</p>
+                  <p className="text-2xl font-bold tracking-wider">{va.account_number}</p>
+                  <p className="mt-2 text-sm">{va.bank_name} · {va.account_name}</p>
+                </div>
+                <Button variant="outline" onClick={() => { navigator.clipboard.writeText(va.account_number); toast.success('Copied'); }}>
+                  <Copy className="h-4 w-4" /> Copy Number
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">No virtual account yet. Creates via MockNombaProvider (pre-July 1).</p>
+                <Button onClick={handleCreateVa} disabled={createVa.isPending}>Generate Mock Virtual Account</Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><QrCode className="h-5 w-5" /> Share QR Code</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><QrCode className="h-5 w-5" /> Share</CardTitle></CardHeader>
           <CardContent className="flex flex-col items-center gap-4">
-            <div className="rounded-xl border bg-white p-4">
-              <QRCodeSVG value={campaign.shareLink} size={160} />
-            </div>
-            <p className="text-center text-sm text-muted-foreground break-all">{campaign.shareLink}</p>
+            {publicUrl ? (
+              <>
+                <QRCodeSVG value={publicUrl} size={160} />
+                <p className="text-center text-xs break-all text-muted-foreground">{publicUrl}</p>
+                <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(publicUrl); toast.success('Link copied'); }}>Copy Link</Button>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Share link unavailable</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -102,18 +140,19 @@ export default function CampaignDetailPage() {
           <CardHeader><CardTitle>Contributors</CardTitle></CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Paid</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Paid</TableHead></TableRow></TableHeader>
               <TableBody>
-                {members.slice(0, 5).map((m) => (
+                {!members?.length ? (
+                  <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground">No contributors yet</TableCell></TableRow>
+                ) : members.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8"><AvatarFallback>{getInitials(m.name)}</AvatarFallback></Avatar>
-                        <span className="font-medium">{m.name}</span>
+                        {m.name}
                       </div>
                     </TableCell>
-                    <TableCell>{formatNaira(m.totalPaid)}</TableCell>
-                    <TableCell><StatusBadge status={m.paymentStatus} /></TableCell>
+                    <TableCell>{formatNaira(Number(m.total_contributed ?? 0))}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -127,13 +166,13 @@ export default function CampaignDetailPage() {
             <Table>
               <TableHeader><TableRow><TableHead>Payer</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
               <TableBody>
-                {txns.length === 0 ? (
+                {!txns?.length ? (
                   <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No payments yet</TableCell></TableRow>
                 ) : txns.map((t) => (
                   <TableRow key={t.id}>
-                    <TableCell>{t.payer}</TableCell>
-                    <TableCell className="font-medium">{formatNaira(t.amount)}</TableCell>
-                    <TableCell><StatusBadge status={t.reconciliationStatus} /></TableCell>
+                    <TableCell>{t.contributor_name}</TableCell>
+                    <TableCell>{formatNaira(Number(t.amount))}</TableCell>
+                    <TableCell><StatusBadge status={t.status} /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>

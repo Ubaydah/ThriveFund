@@ -16,13 +16,13 @@ export const db = mysql.createPool({
   ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
 });
 
-/** Run a SELECT — returns typed rows. */
+/** Run a SELECT — returns typed rows. Uses query() not execute() so LIMIT/OFFSET placeholders work. */
 export async function query<T = RowDataPacket>(
   sql: string,
   values?: unknown[],
 ): Promise<T[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [rows] = await db.execute<(T & RowDataPacket)[]>(sql, values as any[]);
+  const [rows] = await db.query<(T & RowDataPacket)[]>(sql, values as any[]);
   return rows as T[];
 }
 

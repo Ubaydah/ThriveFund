@@ -10,14 +10,17 @@ Next.js dashboard for payment collection and reconciliation.
 - shadcn/ui
 - Recharts
 
-## Mock data mode
+## API integration
 
-All data is mocked until July 1 hackathon build phase. No live Nomba integration.
+The frontend is wired to the backend API. See **[INTEGRATION.md](./INTEGRATION.md)** for setup, test credentials, and endpoint mapping.
 
 ```bash
-NEXT_PUBLIC_USE_MOCK_DATA=true
-NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+# frontend/.env.local
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3001/api/v1
+NEXT_PUBLIC_WEBHOOK_BASE_URL=http://localhost:3001/api/webhooks
 ```
+
+API client: `lib/api/client.ts` · Contract: `lib/api/contract.ts` · Hooks: `hooks/use-api.ts`
 
 ## Run
 

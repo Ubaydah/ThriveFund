@@ -1,54 +1,82 @@
-import Link from 'next/link';
+'use client';
+
+import { useState } from 'react';
 import { Plus, Building2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/page-header';
+import { LoadingState, ErrorState, EmptyState } from '@/components/shared/query-states';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { organizations, orgTypeLabels } from '@/lib/mock-data';
-import { formatNaira } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useOrganizations, useCreateOrganization } from '@/hooks/use-api';
+import { getAuthErrorMessage } from '@/contexts/auth-context';
+
+const ORG_TYPES = ['school', 'mosque', 'church', 'cooperative', 'association', 'ngo', 'business', 'event', 'other'];
 
 export default function OrganizationsPage() {
+  const { data: orgs, isLoading, error, refetch } = useOrganizations();
+  const createOrg = useCreateOrganization();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: '', type: 'school', description: '' });
+
+  const handleCreate = async () => {
+    try {
+      await createOrg.mutateAsync(form);
+      toast.success('Organization created');
+      setShowForm(false);
+      setForm({ name: '', type: 'school', description: '' });
+    } catch (err) {
+      toast.error(getAuthErrorMessage(err));
+    }
+  };
+
+  if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState message={getAuthErrorMessage(error)} onRetry={() => refetch()} />;
+
   return (
     <div>
       <PageHeader
         title="Organizations"
         description="Manage schools, mosques, cooperatives, NGOs, and more"
-        action={<Button><Plus className="h-4 w-4" /> New Organization</Button>}
+        action={<Button onClick={() => setShowForm(!showForm)}><Plus className="h-4 w-4" /> New Organization</Button>}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {organizations.map((org) => (
-          <Card key={org.id} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="mb-4 flex items-start justify-between">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
-                  <Building2 className="h-5 w-5 text-primary" />
+      {showForm && (
+        <Card className="mb-6">
+          <CardContent className="space-y-4 p-6">
+            <Input placeholder="Organization name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{ORG_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+            </Select>
+            <Input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <Button onClick={handleCreate} disabled={createOrg.isPending || !form.name}>Create</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!orgs?.length ? (
+        <EmptyState title="No organizations" description="Create an organization to group campaigns and members." />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {orgs.map((org) => (
+            <Card key={org.id}>
+              <CardContent className="p-6">
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                    <Building2 className="h-5 w-5 text-primary" />
+                  </div>
+                  <Badge variant="secondary">{org.type}</Badge>
                 </div>
-                <Badge variant="secondary">{orgTypeLabels[org.type]}</Badge>
-              </div>
-              <h3 className="mb-1 text-lg font-semibold text-thrive-dark">{org.name}</h3>
-              <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">{org.description}</p>
-              <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-4 text-center">
-                <div>
-                  <p className="text-sm font-bold text-thrive-dark">{org.campaignsCount}</p>
-                  <p className="text-xs text-muted-foreground">Campaigns</p>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-thrive-dark">{org.membersCount}</p>
-                  <p className="text-xs text-muted-foreground">Members</p>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-primary">{formatNaira(org.totalCollected).replace('₦', '₦')}</p>
-                  <p className="text-xs text-muted-foreground">Collected</p>
-                </div>
-              </div>
-              <Button variant="outline" className="mt-4 w-full" asChild>
-                <Link href={`/dashboard/organizations/${org.id}`}>Manage</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <h3 className="mb-1 text-lg font-semibold">{org.name}</h3>
+                <p className="line-clamp-2 text-sm text-muted-foreground">{org.description ?? 'No description'}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

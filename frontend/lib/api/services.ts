@@ -1,0 +1,142 @@
+import { apiRequest, webhookRequest } from './client';
+import type {
+  AdminOverview,
+  AuthTokens,
+  CategoryBreakdown,
+  Contributor,
+  DashboardOverview,
+  FinancialSummary,
+  Goal,
+  GoalPerformance,
+  Invitation,
+  MonthlyContribution,
+  Notification,
+  Organization,
+  PublicGoal,
+  ReconciliationOverview,
+  ReconciliationRecord,
+  ShareLink,
+  TopContributor,
+  Transaction,
+  User,
+  VirtualAccount,
+  MockSimulateResult,
+} from './types';
+
+export const authApi = {
+  register: (body: { full_name: string; email: string; password: string; phone_number?: string }) =>
+    apiRequest<{ user: User; tokens: AuthTokens }>('/auth/register', { method: 'POST', body: JSON.stringify(body), skipAuth: true }),
+  login: (body: { email: string; password: string }) =>
+    apiRequest<{ user: User; tokens: AuthTokens }>('/auth/login', { method: 'POST', body: JSON.stringify(body), skipAuth: true }),
+  logout: (refresh_token: string) =>
+    apiRequest<void>('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token }) }),
+  me: () => apiRequest<User>('/auth/me'),
+};
+
+export const usersApi = {
+  getProfile: () => apiRequest<User>('/users/me'),
+  updateProfile: (body: Partial<{ full_name: string; phone_number: string }>) =>
+    apiRequest<User>('/users/me', { method: 'PATCH', body: JSON.stringify(body) }),
+  changePassword: (body: { current_password: string; new_password: string }) =>
+    apiRequest<{ message: string }>('/users/me/password', { method: 'PATCH', body: JSON.stringify(body) }),
+};
+
+export const organizationsApi = {
+  list: (params?: { page?: number; per_page?: number }) =>
+    apiRequest<Organization[]>('/organizations', { params }),
+  get: (id: string) => apiRequest<Organization>(`/organizations/${id}`),
+  create: (body: { name: string; type: string; description?: string; email?: string; phone?: string; address?: string }) =>
+    apiRequest<Organization>('/organizations', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: Record<string, unknown>) =>
+    apiRequest<Organization>(`/organizations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+};
+
+export const goalsApi = {
+  list: (params?: { status?: string; category?: string; q?: string; page?: number; per_page?: number }) =>
+    apiRequest<Goal[]>('/goals', { params }),
+  get: (id: string) => apiRequest<Goal>(`/goals/${id}`),
+  create: (body: { title: string; description?: string; target_amount: number; category: string; deadline: string; color?: string }) =>
+    apiRequest<Goal>('/goals', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: Record<string, unknown>) =>
+    apiRequest<Goal>(`/goals/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  delete: (id: string) => apiRequest<void>(`/goals/${id}`, { method: 'DELETE' }),
+  close: (id: string) => apiRequest<Goal>(`/goals/${id}/close`, { method: 'POST' }),
+  share: (id: string) => apiRequest<ShareLink>(`/goals/${id}/share`),
+  createVirtualAccount: (id: string, body?: { account_name_suffix?: string; preferred_bank?: string }) =>
+    apiRequest<VirtualAccount>(`/goals/${id}/virtual-account`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
+  getVirtualAccount: (id: string) => apiRequest<VirtualAccount>(`/goals/${id}/virtual-account`),
+  transactions: (id: string, params?: { page?: number; per_page?: number }) =>
+    apiRequest<Transaction[]>(`/goals/${id}/transactions`, { params }),
+  contributors: (id: string) => apiRequest<Contributor[]>(`/goals/${id}/contributors`),
+  addContributor: (id: string, body: { name: string; email?: string; phone_number?: string }) =>
+    apiRequest<Contributor>(`/goals/${id}/contributors`, { method: 'POST', body: JSON.stringify(body) }),
+  sendInvitations: (id: string, body: { recipients: { email: string; name?: string }[]; channel: string; message?: string }) =>
+    apiRequest<Invitation[]>(`/goals/${id}/invitations`, { method: 'POST', body: JSON.stringify(body) }),
+  listInvitations: (id: string) => apiRequest<Invitation[]>(`/goals/${id}/invitations`),
+};
+
+export const virtualAccountsApi = {
+  list: () => apiRequest<VirtualAccount[]>('/virtual-accounts'),
+  get: (id: string) => apiRequest<VirtualAccount>(`/virtual-accounts/${id}`),
+};
+
+export const transactionsApi = {
+  list: (params?: { goal_id?: string; status?: string; from?: string; to?: string; q?: string; page?: number; per_page?: number }) =>
+    apiRequest<Transaction[]>('/transactions', { params }),
+  exportCsv: (params?: { goal_id?: string; from?: string; to?: string; status?: string }) =>
+    apiRequest<string>('/transactions/export', { params }),
+};
+
+export const contributorsApi = {
+  listAll: () => apiRequest<Contributor[]>('/contributors'),
+};
+
+export const reconciliationApi = {
+  overview: () => apiRequest<ReconciliationOverview>('/reconciliation/overview'),
+  list: (params?: { status?: string; page?: number; per_page?: number }) =>
+    apiRequest<ReconciliationRecord[]>('/reconciliation', { params }),
+  get: (id: string) => apiRequest<ReconciliationRecord>(`/reconciliation/${id}`),
+};
+
+export const reportsApi = {
+  financialSummary: () => apiRequest<FinancialSummary>('/reports/financial-summary'),
+  transactionsExport: (params?: { goal_id?: string; from?: string; to?: string }) =>
+    apiRequest<string>('/reports/transactions/export', { params }),
+  reconciliation: (params?: { page?: number; per_page?: number }) =>
+    apiRequest<ReconciliationRecord[]>('/reports/reconciliation', { params }),
+};
+
+export const dashboardApi = {
+  overview: () => apiRequest<DashboardOverview>('/dashboard/overview'),
+};
+
+export const analyticsApi = {
+  monthlyContributions: (months = 6) =>
+    apiRequest<MonthlyContribution[]>('/analytics/monthly-contributions', { params: { months } }),
+  categoryBreakdown: () => apiRequest<CategoryBreakdown[]>('/analytics/category-breakdown'),
+  topContributors: (limit = 10) =>
+    apiRequest<TopContributor[]>('/analytics/top-contributors', { params: { limit } }),
+  goalPerformance: () => apiRequest<GoalPerformance[]>('/analytics/goal-performance'),
+};
+
+export const notificationsApi = {
+  list: (params?: { unread_only?: boolean; page?: number; per_page?: number }) =>
+    apiRequest<Notification[]>('/notifications', { params: { ...params, unread_only: params?.unread_only } }),
+  unreadCount: () => apiRequest<{ count: number }>('/notifications/unread-count'),
+  markRead: (id: string) => apiRequest<void>(`/notifications/${id}/read`, { method: 'PATCH' }),
+  markAllRead: () => apiRequest<void>('/notifications/read-all', { method: 'POST' }),
+};
+
+export const publicApi = {
+  getGoal: (slug: string) => apiRequest<PublicGoal>(`/public/goals/${slug}`, { skipAuth: true }),
+  getVirtualAccount: (slug: string) => apiRequest<VirtualAccount>(`/public/goals/${slug}/virtual-account`, { skipAuth: true }),
+};
+
+export const adminApi = {
+  overview: () => apiRequest<AdminOverview>('/admin/overview'),
+};
+
+export const webhooksApi = {
+  simulatePayment: (body: { account_number: string; amount: number; payer_name?: string }) =>
+    webhookRequest<MockSimulateResult>('/mock/simulate', body),
+};

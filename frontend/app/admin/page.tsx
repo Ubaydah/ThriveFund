@@ -1,67 +1,41 @@
-import { Building2, Target, Users, ArrowLeftRight, CreditCard, TrendingUp } from 'lucide-react';
+'use client';
+
+import { Target, Users, ArrowLeftRight, CreditCard, TrendingUp } from 'lucide-react';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatCard } from '@/components/shared/stat-card';
-import { MonthlyChart } from '@/components/charts/monthly-chart';
+import { LoadingState, ErrorState } from '@/components/shared/query-states';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { adminStats, monthlyCollections, organizations, transactions } from '@/lib/mock-data';
+import { useAdminOverview, useAnalyticsMonthly } from '@/hooks/use-api';
+import { MonthlyChart } from '@/components/charts/monthly-chart';
 import { formatNaira } from '@/lib/utils';
+import { getAuthErrorMessage } from '@/contexts/auth-context';
+import { ApiError } from '@/lib/api/client';
 
 export default function AdminDashboardPage() {
+  const { data, isLoading, error, refetch } = useAdminOverview();
+  const { data: monthly } = useAnalyticsMonthly();
+
+  if (isLoading) return <LoadingState />;
+  if (error) {
+    const msg = error instanceof ApiError && error.status === 403
+      ? 'Admin access required. Log in as admin@thrivefund.ng'
+      : getAuthErrorMessage(error);
+    return <ErrorState message={msg} onRetry={() => refetch()} />;
+  }
+
   return (
     <div>
-      <PageHeader title="Platform Admin" description="Platform-level overview — all users, organizations, and volume" />
-
+      <PageHeader title="Platform Admin" description="Platform-level overview (admin role required)" />
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard title="Total Users" value={adminStats.totalUsers.toLocaleString()} icon={Users} />
-        <StatCard title="Organizations" value={String(adminStats.totalOrganizations)} icon={Building2} />
-        <StatCard title="Campaigns" value={adminStats.totalCampaigns.toLocaleString()} icon={Target} />
-        <StatCard title="Transactions" value={adminStats.totalTransactions.toLocaleString()} icon={ArrowLeftRight} />
-        <StatCard title="Total Volume" value={formatNaira(adminStats.totalVolume)} icon={TrendingUp} />
-        <StatCard title="Active Virtual Accounts" value={adminStats.activeVirtualAccounts.toLocaleString()} icon={CreditCard} />
+        <StatCard title="Total Users" value={String(data?.total_users ?? 0)} icon={Users} />
+        <StatCard title="Campaigns" value={String(data?.total_goals ?? 0)} icon={Target} />
+        <StatCard title="Transactions" value={String(data?.total_transactions ?? 0)} icon={ArrowLeftRight} />
+        <StatCard title="Total Volume" value={formatNaira(Number(data?.total_volume_ngn ?? 0))} icon={TrendingUp} />
+        <StatCard title="Reconciliation Matched" value={String(data?.reconciliation?.matched ?? 0)} icon={CreditCard} subtitle={data?.reconciliation?.auto_match_rate} />
       </div>
-
-      <div className="mb-8 grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle>Platform Volume Trend</CardTitle></CardHeader>
-          <CardContent><MonthlyChart data={monthlyCollections} /></CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Top Organizations</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader><TableRow><TableHead>Organization</TableHead><TableHead>Collected</TableHead><TableHead>Members</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {organizations.slice(0, 5).map((o) => (
-                  <TableRow key={o.id}>
-                    <TableCell className="font-medium">{o.name}</TableCell>
-                    <TableCell>{formatNaira(o.totalCollected)}</TableCell>
-                    <TableCell>{o.membersCount}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card>
-        <CardHeader><CardTitle>Recent Platform Transactions</CardTitle></CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader><TableRow><TableHead>Reference</TableHead><TableHead>Payer</TableHead><TableHead>Amount</TableHead><TableHead>Organization</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {transactions.slice(0, 6).map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-mono text-xs">{t.reference}</TableCell>
-                  <TableCell>{t.payer}</TableCell>
-                  <TableCell>{formatNaira(t.amount)}</TableCell>
-                  <TableCell>{t.organizationName}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
+        <CardHeader><CardTitle>Monthly Volume (your account)</CardTitle></CardHeader>
+        <CardContent>{monthly?.length ? <MonthlyChart data={monthly.map((m) => ({ month: m.month, amount: Number(m.amount) }))} /> : null}</CardContent>
       </Card>
     </div>
   );

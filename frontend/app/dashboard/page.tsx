@@ -1,25 +1,30 @@
+'use client';
+
 import Link from 'next/link';
 import { ArrowRight, Building2, RefreshCw, Target, Users } from 'lucide-react';
 import { MonthlyChart } from '@/components/charts/monthly-chart';
 import { PageHeader } from '@/components/shared/page-header';
 import { StatCard } from '@/components/shared/stat-card';
 import { StatusBadge } from '@/components/shared/status-badge';
+import { LoadingState, ErrorState, EmptyState } from '@/components/shared/query-states';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import {
-  campaigns,
-  dashboardStats,
-  monthlyCollections,
-  reconciliationOverview,
-  transactions,
-} from '@/lib/mock-data';
-import { calcProgress, formatNaira } from '@/lib/utils';
+import { useDashboard, useReconciliationOverview, useAnalyticsMonthly } from '@/hooks/use-api';
+import { formatNaira } from '@/lib/utils';
+import { getAuthErrorMessage } from '@/contexts/auth-context';
 
 export default function DashboardPage() {
-  const recentTxns = transactions.slice(0, 5);
-  const topCampaigns = campaigns.filter((c) => c.status === 'active').slice(0, 4);
+  const { data: overview, isLoading, error, refetch } = useDashboard();
+  const { data: recon } = useReconciliationOverview();
+  const { data: monthly } = useAnalyticsMonthly();
+
+  if (isLoading) return <LoadingState message="Loading dashboard..." />;
+  if (error) return <ErrorState message={getAuthErrorMessage(error)} onRetry={() => refetch()} />;
+  if (!overview) return <EmptyState title="No data yet" description="Create a campaign to start collecting payments." />;
+
+  const pendingRecon = (recon?.unmatched ?? 0) + (recon?.pending ?? 0);
 
   return (
     <div>
@@ -30,39 +35,38 @@ export default function DashboardPage() {
       />
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Total Collected" value={formatNaira(dashboardStats.totalCollected)} icon={Building2} trend={{ value: '+12.4% vs last month', positive: true }} />
-        <StatCard title="Active Campaigns" value={String(dashboardStats.activeCampaigns)} icon={Target} subtitle="Across all organizations" />
-        <StatCard title="Contributors / Members" value={dashboardStats.contributors.toLocaleString()} icon={Users} />
-        <StatCard title="Pending Reconciliation" value={String(dashboardStats.pendingReconciliation)} icon={RefreshCw} subtitle={`${dashboardStats.reconciliationAccuracy}% auto-match rate`} />
+        <StatCard title="Total Collected" value={formatNaira(Number(overview.total_saved))} icon={Building2} />
+        <StatCard title="Active Campaigns" value={String(overview.active_goals)} icon={Target} />
+        <StatCard title="Contributors" value={String(overview.contributors_count)} icon={Users} />
+        <StatCard title="Pending Reconciliation" value={String(pendingRecon)} icon={RefreshCw} subtitle={recon ? `${recon.auto_match_rate} auto-match` : undefined} />
       </div>
 
       <div className="mb-8 grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Monthly Collections</CardTitle></CardHeader>
-          <CardContent><MonthlyChart data={monthlyCollections} /></CardContent>
+          <CardContent>
+            {monthly?.length ? <MonthlyChart data={monthly.map((m) => ({ month: m.month, amount: Number(m.amount) }))} /> : <EmptyState title="No payments yet" description="Collections will appear here." />}
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader><CardTitle>Reconciliation Health</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {[
-              { label: 'Matched', value: reconciliationOverview.matched, color: 'bg-emerald-500' },
-              { label: 'Unmatched', value: reconciliationOverview.unmatched, color: 'bg-red-500' },
-              { label: 'Pending Review', value: reconciliationOverview.pendingReview, color: 'bg-amber-500' },
-              { label: 'Duplicate', value: reconciliationOverview.duplicate, color: 'bg-slate-400' },
-            ].map((item) => (
-              <div key={item.label}>
-                <div className="mb-1 flex justify-between text-sm">
+        {recon && (
+          <Card>
+            <CardHeader><CardTitle>Reconciliation Health</CardTitle></CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {[
+                { label: 'Matched', value: recon.matched },
+                { label: 'Unmatched', value: recon.unmatched },
+                { label: 'Pending', value: recon.pending },
+                { label: 'Manual', value: recon.manual },
+              ].map((item) => (
+                <div key={item.label} className="flex justify-between">
                   <span>{item.label}</span>
                   <span className="font-medium">{item.value}</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div className={`h-full ${item.color}`} style={{ width: `${(item.value / reconciliationOverview.incoming) * 100}%` }} />
-                </div>
-              </div>
-            ))}
-            <p className="text-sm font-semibold text-primary">{reconciliationOverview.accuracy}% reconciliation accuracy</p>
-          </CardContent>
-        </Card>
+              ))}
+              <p className="pt-2 font-semibold text-primary">{recon.auto_match_rate} accuracy</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -72,43 +76,44 @@ export default function DashboardPage() {
             <Button variant="ghost" size="sm" asChild><Link href="/dashboard/transactions">View all <ArrowRight className="ml-1 h-4 w-4" /></Link></Button>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Payer</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentTxns.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>
-                      <div><p className="font-medium">{t.payer}</p><p className="text-xs text-muted-foreground">{t.campaignName}</p></div>
-                    </TableCell>
-                    <TableCell className="font-medium">{formatNaira(t.amount)}</TableCell>
-                    <TableCell><StatusBadge status={t.reconciliationStatus} /></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            {!overview.recent_transactions?.length ? (
+              <EmptyState title="No transactions" description="Simulate a payment or wait for incoming transfers." />
+            ) : (
+              <Table>
+                <TableHeader><TableRow><TableHead>Payer</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {overview.recent_transactions.map((t) => (
+                    <TableRow key={t.id}>
+                      <TableCell>
+                        <p className="font-medium">{t.contributor_name}</p>
+                        <p className="text-xs text-muted-foreground">{t.goal_title}</p>
+                      </TableCell>
+                      <TableCell>{formatNaira(Number(t.amount))}</TableCell>
+                      <TableCell><StatusBadge status={t.status} /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Active Campaigns</CardTitle>
+            <CardTitle>Recent Campaigns</CardTitle>
             <Button variant="ghost" size="sm" asChild><Link href="/dashboard/campaigns">View all</Link></Button>
           </CardHeader>
           <CardContent className="space-y-5">
-            {topCampaigns.map((c) => (
+            {!overview.recent_goals?.length ? (
+              <EmptyState title="No campaigns" description="Create your first payment campaign." />
+            ) : overview.recent_goals.map((c) => (
               <div key={c.id}>
                 <div className="mb-2 flex justify-between text-sm">
-                  <Link href={`/dashboard/campaigns/${c.id}`} className="font-medium hover:text-primary">{c.name}</Link>
-                  <span className="text-muted-foreground">{calcProgress(c.raised, c.target)}%</span>
+                  <Link href={`/dashboard/campaigns/${c.id}`} className="font-medium hover:text-primary">{c.title}</Link>
+                  <span>{c.progress_percent ?? 0}%</span>
                 </div>
-                <Progress value={calcProgress(c.raised, c.target)} />
-                <p className="mt-1 text-xs text-muted-foreground">{formatNaira(c.raised)} of {formatNaira(c.target)}</p>
+                <Progress value={Number(c.progress_percent ?? 0)} />
+                <p className="mt-1 text-xs text-muted-foreground">{formatNaira(Number(c.current_amount))} of {formatNaira(Number(c.target_amount))}</p>
               </div>
             ))}
           </CardContent>
