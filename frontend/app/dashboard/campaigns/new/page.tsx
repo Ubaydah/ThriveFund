@@ -2,15 +2,16 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useCreateGoal } from '@/hooks/use-api';
+import { LoadingState } from '@/components/shared/query-states';
+import { useCreateGoal, useOrganizations } from '@/hooks/use-api';
 import { getAuthErrorMessage } from '@/contexts/auth-context';
 
 const CATEGORIES = [
@@ -25,7 +26,9 @@ const CATEGORIES = [
 export default function NewCampaignPage() {
   const router = useRouter();
   const createGoal = useCreateGoal();
+  const { data: organizations, isLoading: organizationsLoading } = useOrganizations();
   const [form, setForm] = useState({
+    organization_id: '',
     title: '',
     description: '',
     target_amount: '',
@@ -33,10 +36,21 @@ export default function NewCampaignPage() {
     deadline: '',
   });
 
+  useEffect(() => {
+    if (!form.organization_id && organizations?.length === 1) {
+      setForm((current) => ({ ...current, organization_id: organizations[0].id }));
+    }
+  }, [form.organization_id, organizations]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.organization_id) {
+      toast.error('Choose an organization for this campaign');
+      return;
+    }
     try {
       const res = await createGoal.mutateAsync({
+        organization_id: form.organization_id,
         title: form.title,
         description: form.description || undefined,
         target_amount: Number(form.target_amount),
@@ -50,15 +64,45 @@ export default function NewCampaignPage() {
     }
   };
 
+  if (organizationsLoading) return <LoadingState message="Loading organizations..." />;
+
   return (
     <div>
       <Button variant="ghost" size="sm" className="mb-4" asChild>
         <Link href="/dashboard/campaigns"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
       </Button>
       <PageHeader title="Create Campaign" description="Set up a new payment collection campaign" />
+
+      {!organizations?.length ? (
+        <Card className="max-w-2xl border-primary/30">
+          <CardContent className="p-6">
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <h2 className="mb-2 text-lg font-semibold">Create an organization first</h2>
+            <p className="mb-5 text-sm text-muted-foreground">
+              Campaigns belong to an organization so collections, contributors, and reconciliation stay grouped correctly.
+            </p>
+            <Button asChild>
+              <Link href="/dashboard/organizations">Create Organization</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
       <Card className="max-w-2xl">
         <CardContent className="p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Organization</label>
+              <Select value={form.organization_id} onValueChange={(v) => setForm({ ...form, organization_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Choose organization" /></SelectTrigger>
+                <SelectContent>
+                  {organizations.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Input placeholder="Campaign title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
             <Input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
@@ -67,10 +111,11 @@ export default function NewCampaignPage() {
             </Select>
             <Input type="number" placeholder="Target amount (₦)" value={form.target_amount} onChange={(e) => setForm({ ...form, target_amount: e.target.value })} required min={1} />
             <Input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} required />
-            <Button type="submit" className="w-full" disabled={createGoal.isPending}>{createGoal.isPending ? 'Creating...' : 'Create Campaign'}</Button>
+            <Button type="submit" className="w-full" disabled={createGoal.isPending || !form.organization_id}>{createGoal.isPending ? 'Creating...' : 'Create Campaign'}</Button>
           </form>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }

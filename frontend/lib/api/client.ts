@@ -46,6 +46,8 @@ type RequestOptions = RequestInit & {
   skipAuth?: boolean;
 };
 
+const REQUEST_TIMEOUT_MS = 10_000;
+
 function buildUrl(path: string, params?: RequestOptions['params']) {
   const base = path.startsWith('http') ? path : `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
   if (!params) return base;
@@ -81,6 +83,7 @@ export async function apiRequest<T>(
 ): Promise<{ data: T; meta?: PaginationMeta }> {
   const { params, skipAuth, headers: customHeaders, ...init } = options;
   const url = buildUrl(path, params);
+  const signal = init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
   const headers: Record<string, string> = {
     ...(init.body ? { 'Content-Type': 'application/json' } : {}),
@@ -92,13 +95,13 @@ export async function apiRequest<T>(
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  let res = await fetch(url, { ...init, headers, credentials: 'include' });
+  let res = await fetch(url, { ...init, headers, credentials: 'include', signal });
 
   if (res.status === 401 && !skipAuth) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       headers.Authorization = `Bearer ${newToken}`;
-      res = await fetch(url, { ...init, headers, credentials: 'include' });
+      res = await fetch(url, { ...init, headers, credentials: 'include', signal });
     }
   }
 
@@ -134,6 +137,7 @@ export async function webhookRequest<T>(path: string, body: unknown): Promise<T>
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   const json = await res.json();
   if (!res.ok) {

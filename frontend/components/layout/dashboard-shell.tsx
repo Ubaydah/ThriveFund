@@ -29,18 +29,20 @@ import { useUnreadCount } from '@/hooks/use-api';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/organizations', label: 'Organizations', icon: Building2 },
   { href: '/dashboard/campaigns', label: 'Campaigns', icon: Target },
-  { href: '/dashboard/virtual-accounts', label: 'Virtual Accounts', icon: CreditCard },
   { href: '/dashboard/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { href: '/dashboard/reconciliation', label: 'Reconciliation', icon: RefreshCw },
   { href: '/dashboard/contributors', label: 'Contributors', icon: Users },
   { href: '/dashboard/reports', label: 'Reports', icon: FileText },
+];
+
+const secondaryNavItems = [
+  { href: '/dashboard/organizations', label: 'Organizations', icon: Building2 },
+  { href: '/dashboard/virtual-accounts', label: 'Virtual Accounts', icon: CreditCard },
   { href: '/dashboard/invitations', label: 'Invitations', icon: Mail },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
-  { href: '/admin', label: 'Admin', icon: Shield },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -88,6 +90,26 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-4">
           {navItems.map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? pathname === href : pathname === href || pathname.startsWith(href + '/');
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => window.innerWidth < 1024 && setOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all',
+                  active ? 'bg-primary text-white' : 'text-slate-400 hover:bg-white/10 hover:text-white',
+                )}
+              >
+                <Icon size={18} className="shrink-0" />
+                {open && <span className="flex-1 font-medium">{label}</span>}
+              </Link>
+            );
+          })}
+
+          <div className="my-3 border-t border-white/10" />
+
+          {secondaryNavItems.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(href + '/');
             const badge = href === '/dashboard/notifications' && unread?.count ? unread.count : null;
             return (
               <Link
@@ -111,6 +133,25 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+
+          {user.role === 'admin' && (
+            <>
+              <div className="my-3 border-t border-white/10" />
+              <Link
+                href="/admin"
+                onClick={() => window.innerWidth < 1024 && setOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all',
+                  pathname === '/admin' || pathname.startsWith('/admin/')
+                    ? 'bg-primary text-white'
+                    : 'text-slate-400 hover:bg-white/10 hover:text-white',
+                )}
+              >
+                <Shield size={18} className="shrink-0" />
+                {open && <span className="flex-1 font-medium">Admin</span>}
+              </Link>
+            </>
+          )}
         </nav>
 
         {open && (

@@ -27,6 +27,18 @@ export const organizationsRepository = {
     return rows[0] ?? null;
   },
 
+  async canAccess(id: string, userId: string): Promise<boolean> {
+    const rows = await query<{ id: string }>(
+      `SELECT o.id
+       FROM organizations o
+       LEFT JOIN organization_members om ON om.organization_id = o.id
+       WHERE o.id = ? AND (o.owner_id = ? OR om.user_id = ?)
+       LIMIT 1`,
+      [id, userId, userId],
+    );
+    return Boolean(rows[0]);
+  },
+
   async findBySlug(slug: string) {
     const rows = await query('SELECT * FROM organizations WHERE slug = ?', [slug]);
     return rows[0] ?? null;

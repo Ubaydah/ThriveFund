@@ -54,6 +54,7 @@ export interface Goal {
   id: string;
   user_id: string;
   organization_id?: string | null;
+  organization_name?: string | null;
   title: string;
   description?: string | null;
   target_amount: number;

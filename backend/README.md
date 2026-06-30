@@ -2,7 +2,7 @@
 
 Node.js + TypeScript + Express modular monolith for payment collection and reconciliation using **Dedicated Virtual Accounts**.
 
-> **Hackathon constraint (before July 1):** No live Nomba API calls. Use `PAYMENT_PROVIDER=mock_nomba` (default). Real Nomba integration goes behind `NombaProvider` when the build phase starts.
+> **Local/demo mode:** No live Nomba API calls are made while `PAYMENT_PROVIDER=mock_nomba` is active. Real provider calls belong behind `NombaProvider`.
 
 ## Stack
 
@@ -99,10 +99,10 @@ JWT_SECRET=...
 JWT_REFRESH_SECRET=...
 BREVO_API_KEY=...
 BREVO_SENDER_EMAIL=...
-FRONTEND_URL=http://localhost:5173
-CORS_ORIGIN=http://localhost:5173
+FRONTEND_URL=http://localhost:3000
+CORS_ORIGIN=http://localhost:3000
 
-# Payment provider — use mock_nomba until July 1
+# Payment provider — use mock_nomba for local/demo flows
 PAYMENT_PROVIDER=mock_nomba
 NOMBA_WEBHOOK_SECRET=dev-secret   # optional for mock signature validation
 ```
@@ -135,7 +135,7 @@ curl -X POST http://localhost:3001/api/webhooks/mock/simulate \
 
 See [../docs/api/endpoints.md](../docs/api/endpoints.md)
 
-## Nomba Integration (Post July 1)
+## Nomba Integration
 
 1. Implement `NombaProvider.createVirtualAccount()` with real Nomba API
 2. Implement `NombaProvider.verifyPayment()` with Nomba webhook schema

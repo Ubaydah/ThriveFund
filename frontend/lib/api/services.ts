@@ -55,7 +55,7 @@ export const goalsApi = {
   list: (params?: { status?: string; category?: string; q?: string; page?: number; per_page?: number }) =>
     apiRequest<Goal[]>('/goals', { params }),
   get: (id: string) => apiRequest<Goal>(`/goals/${id}`),
-  create: (body: { title: string; description?: string; target_amount: number; category: string; deadline: string; color?: string }) =>
+  create: (body: { organization_id?: string; title: string; description?: string; target_amount: number; category: string; deadline: string; color?: string }) =>
     apiRequest<Goal>('/goals', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: Record<string, unknown>) =>
     apiRequest<Goal>(`/goals/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

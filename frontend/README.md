@@ -61,4 +61,4 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## API integration
 
-See `lib/api/client.ts` for backend endpoint stubs. Replace mock imports with API calls when ready.
+See `lib/api/client.ts`, `lib/api/services.ts`, and `hooks/use-api.ts` for the active backend integration.

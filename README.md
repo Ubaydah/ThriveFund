@@ -1,6 +1,6 @@
 # ThriveFund
 
-Save, collect, and reconcile payments effortlessly — a React web app for Nigerian businesses and communities.
+Collect and reconcile organization payments through dedicated virtual accounts.
 
 ## Project Structure
 
@@ -8,7 +8,7 @@ Save, collect, and reconcile payments effortlessly — a React web app for Niger
 ThriveFund/
 ├── docs/        # Architecture & API documentation
 ├── backend/     # Node.js + Express + TypeScript (modular monolith)
-└── frontend/    # React + Vite + TypeScript + Tailwind
+└── frontend/    # Next.js + TypeScript + Tailwind
 ```
 
 ## Documentation
@@ -30,7 +30,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Open [http://localhost:3000](http://localhost:3000).
 
 ### Backend
 
@@ -52,14 +52,13 @@ See [backend/README.md](./backend/README.md) for mock payment demo flow.
 ```bash
 cd frontend
 npm run build
-npm run preview
+npm start
 ```
 
 ## Tech Stack
 
-- React 18 + TypeScript
-- Vite
+- Next.js 15 + React 19
+- TypeScript
 - Tailwind CSS
-- React Router
 - Recharts
 - Lucide React

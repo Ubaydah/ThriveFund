@@ -36,6 +36,7 @@ app.use(cors({
     const allowed = [
       env.CORS_ORIGIN,
       'http://localhost:3000',
+      'http://localhost:3002',
       'http://localhost:5173',
       env.FRONTEND_URL,
     ].filter(Boolean);

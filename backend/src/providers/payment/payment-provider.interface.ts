@@ -45,7 +45,7 @@ export interface VerifiedPayment {
 export interface PaymentProvider {
   readonly name: PaymentProviderName;
 
-  /** Create a dedicated virtual account — mock until July 1 hackathon start */
+  /** Create a dedicated virtual account. */
   createVirtualAccount(request: CreateVirtualAccountRequest): Promise<VirtualAccountResult>;
 
   /** Normalize and verify an incoming payment webhook payload */

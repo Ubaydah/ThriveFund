@@ -10,14 +10,14 @@ import type {
 
 /**
  * Placeholder for real Nomba integration.
- * DO NOT implement live API calls before the hackathon build phase (July 1).
+ * Keep live API calls behind explicit provider configuration.
  */
 export class NombaProvider implements PaymentProvider {
   readonly name = PaymentProviderName.Nomba;
 
   private notReady(): never {
     throw Errors.provider(
-      'Live Nomba integration is not enabled yet. Set PAYMENT_PROVIDER=mock until the hackathon build phase begins (July 1).',
+      'Live Nomba integration is not enabled yet. Set PAYMENT_PROVIDER=mock_nomba for local/demo flows.',
     );
   }
 

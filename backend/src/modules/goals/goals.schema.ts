@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const createGoalSchema = z.object({
+  organization_id: z.string().min(1).optional(),
   title: z.string().min(2).max(100),
   description: z.string().max(500).optional(),
   target_amount: z.number().positive(),

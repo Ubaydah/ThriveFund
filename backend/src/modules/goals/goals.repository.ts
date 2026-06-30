@@ -11,6 +11,7 @@ export const goalsRepository = {
   async insert(data: {
     id: string;
     user_id: string;
+    organization_id?: string | null;
     title: string;
     description?: string | null;
     target_amount: number;
@@ -19,9 +20,9 @@ export const goalsRepository = {
     color?: string | null;
   }): Promise<GoalRow> {
     await execute(
-      `INSERT INTO goals (id, user_id, title, description, target_amount, category, deadline, color, status, current_amount, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 0, NOW())`,
-      [data.id, data.user_id, data.title, data.description ?? null,
+      `INSERT INTO goals (id, user_id, organization_id, title, description, target_amount, category, deadline, color, status, current_amount, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 0, NOW())`,
+      [data.id, data.user_id, data.organization_id ?? null, data.title, data.description ?? null,
        data.target_amount, data.category, data.deadline, data.color ?? null],
     );
     const rows = await query<GoalRow>(
@@ -53,12 +54,15 @@ export const goalsRepository = {
     );
 
     const rows = await query<GoalRow>(
-      `SELECT id, title, category, target_amount, current_amount, status, color,
+      `SELECT goals.id, goals.organization_id, goals.title, goals.category, goals.target_amount,
+              goals.current_amount, goals.status, goals.color, organizations.name AS organization_name,
               GREATEST(0, DATEDIFF(deadline, NOW())) AS days_left,
               ROUND((current_amount / NULLIF(target_amount, 0)) * 100) AS progress_percent,
               (SELECT COUNT(*) FROM transactions WHERE goal_id = goals.id AND status = 'successful') AS contributors_count
-       FROM goals WHERE ${where}
-       ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+       FROM goals
+       LEFT JOIN organizations ON organizations.id = goals.organization_id
+       WHERE ${where}
+       ORDER BY goals.created_at DESC LIMIT ? OFFSET ?`,
       [...values, filters.perPage, (filters.page - 1) * filters.perPage],
     );
 
@@ -96,7 +100,7 @@ export const goalsRepository = {
   },
 
   async update(goalId: string, userId: string, fields: Record<string, unknown>): Promise<GoalRow | null> {
-    const allowed = ['title', 'description', 'target_amount', 'category', 'deadline', 'color'];
+    const allowed = ['organization_id', 'title', 'description', 'target_amount', 'category', 'deadline', 'color'];
     const entries = Object.entries(fields).filter(([k]) => allowed.includes(k));
     if (!entries.length) return null;
 

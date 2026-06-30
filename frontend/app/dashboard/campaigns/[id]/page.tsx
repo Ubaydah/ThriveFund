@@ -112,7 +112,7 @@ export default function CampaignDetailPage() {
               </>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground">No virtual account yet. Creates via MockNombaProvider (pre-July 1).</p>
+                <p className="text-sm text-muted-foreground">No virtual account yet. Generate one so contributors have a dedicated account for this campaign.</p>
                 <Button onClick={handleCreateVa} disabled={createVa.isPending}>Generate Mock Virtual Account</Button>
               </>
             )}

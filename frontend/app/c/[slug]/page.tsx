@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { usePublicGoal, usePublicVirtualAccount } from '@/hooks/use-api';
+import { isDemoPayments } from '@/lib/environment';
 import { formatNaira } from '@/lib/utils';
 import { PublicCopyButton } from './copy-button';
 
@@ -54,7 +55,10 @@ export default function PublicCampaignPage({ params }: { params: Promise<{ slug:
                 <p className="text-sm text-muted-foreground">{va.account_name}</p>
               </div>
               <div className="mt-4 flex justify-center"><PublicCopyButton text={va.account_number} /></div>
-              <p className="mt-4 text-center text-xs text-amber-700">Mock virtual account — demo only until July 1</p>
+              <div className="mt-5 rounded-lg bg-white p-4 text-sm text-slate-700">
+                Transfer to this account from your bank app. Your payment will be matched automatically once received.
+              </div>
+              {isDemoPayments && <p className="mt-4 text-center text-xs text-amber-700">Demo virtual account — no live money will move in this environment.</p>}
             </CardContent>
           </Card>
         ) : (

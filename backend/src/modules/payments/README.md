@@ -6,7 +6,7 @@ Handles payment verification via the **PaymentProvider** abstraction. Does not r
 
 ```
 PaymentProvider (interface)
-├── MockNombaProvider  ← active before July 1 (default)
+├── MockNombaProvider  ← active for local/demo flows (default)
 └── NombaProvider      ← placeholder, throws until hackathon build phase
 ```
 

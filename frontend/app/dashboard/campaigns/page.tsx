@@ -42,6 +42,7 @@ export default function CampaignsPage() {
                       <Link href={`/dashboard/campaigns/${c.id}`} className="text-lg font-semibold hover:text-primary">{c.title}</Link>
                       <StatusBadge status={c.status} />
                       <Badge variant="outline">{c.category}</Badge>
+                      {c.organization_name && <Badge variant="secondary">{c.organization_name}</Badge>}
                     </div>
                     <p className="text-sm text-muted-foreground">{c.contributors_count ?? 0} contributors · {c.days_left ?? 0} days left</p>
                     <div className="mt-3 max-w-md">

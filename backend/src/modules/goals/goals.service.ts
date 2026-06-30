@@ -2,10 +2,16 @@ import { v4 as uuid } from 'uuid';
 import { Errors } from '../../lib/errors';
 import { goalsRepository } from './goals.repository';
 import { transactionsRepository } from '../transactions/transactions.repository';
+import { organizationsRepository } from '../organizations/organizations.repository';
 import type { CreateGoalInput, UpdateGoalInput } from './goals.schema';
 
 export const goalsService = {
   async create(userId: string, body: CreateGoalInput) {
+    if (body.organization_id) {
+      const canAccess = await organizationsRepository.canAccess(body.organization_id, userId);
+      if (!canAccess) throw Errors.notFound('Organization');
+    }
+
     const id = `goal_${uuid().replace(/-/g, '').slice(0, 12)}`;
     return goalsRepository.insert({ id, user_id: userId, ...body });
   },
@@ -38,6 +44,11 @@ export const goalsService = {
   async update(userId: string, goalId: string, body: UpdateGoalInput) {
     const exists = await goalsRepository.findByIdRaw(goalId, userId);
     if (!exists) throw Errors.notFound('Goal');
+
+    if (body.organization_id) {
+      const canAccess = await organizationsRepository.canAccess(body.organization_id, userId);
+      if (!canAccess) throw Errors.notFound('Organization');
+    }
 
     const updated = await goalsRepository.update(goalId, userId, body as Record<string, unknown>);
     if (!updated) throw Errors.validation('No valid fields to update');

@@ -56,7 +56,7 @@ PAYMENT_PROVIDER=mock_nomba
 | Login / Signup | POST /auth/login, POST /auth/register |
 | Dashboard | GET /dashboard/overview, GET /reconciliation/overview, GET /analytics/monthly-contributions |
 | Organizations | GET/POST /organizations |
-| Campaigns | GET/POST /goals |
+| Campaigns | GET/POST /goals, GET /organizations |
 | Campaign detail | GET /goals/:id, POST/GET /goals/:id/virtual-account, GET /goals/:id/transactions, GET /goals/:id/contributors, GET /goals/:id/share, POST /api/webhooks/mock/simulate |
 | Virtual Accounts | GET /virtual-accounts |
 | Transactions | GET /transactions |
@@ -72,9 +72,10 @@ PAYMENT_PROVIDER=mock_nomba
 
 ## Mock / pre-Nomba flows
 
+- Campaign creation requires an organization, then sends `organization_id` to POST /goals
 - Virtual account creation → `MockNombaProvider` (POST /goals/:id/virtual-account)
 - Payment simulation → POST /api/webhooks/mock/simulate
-- No live Nomba API calls before July 1
+- Demo/local flows do not call live payment-provider APIs while `PAYMENT_PROVIDER=mock_nomba`
 
 ## Missing backend endpoints (frontend gaps)
 
@@ -86,7 +87,7 @@ PAYMENT_PROVIDER=mock_nomba
 ## Demo flow
 
 1. Login as `adebayo@thrivefund.ng`
-2. Create campaign or open seed goal
+2. Create an organization, then create a campaign under it
 3. Campaign detail → **Generate Mock Virtual Account**
 4. **Simulate Payment** (calls mock webhook)
 5. Check Dashboard, Transactions, Reconciliation

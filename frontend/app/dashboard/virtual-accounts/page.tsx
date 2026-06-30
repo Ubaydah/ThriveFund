@@ -19,7 +19,7 @@ export default function VirtualAccountsPage() {
 
   return (
     <div>
-      <PageHeader title="Virtual Accounts" description="Mock dedicated accounts — MockNombaProvider until July 1" />
+      <PageHeader title="Virtual Accounts" description="Dedicated accounts connected to campaigns" />
       {!accounts?.length ? (
         <EmptyState title="No virtual accounts" description="Create a virtual account from a campaign detail page." />
       ) : (

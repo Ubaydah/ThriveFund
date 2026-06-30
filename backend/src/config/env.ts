@@ -17,11 +17,11 @@ const schema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('1h'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
-  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  CORS_ORIGIN: z.string().default('http://localhost:3000'),
   BREVO_API_KEY: z.string().min(1),
   BREVO_SENDER_EMAIL: z.string().email(),
   BREVO_SENDER_NAME: z.string().default('ThriveFund'),
-  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().url().default('http://localhost:3000'),
   /** mock_nomba (default) | nomba — live Nomba only after hackathon build phase */
   PAYMENT_PROVIDER: z.enum(['mock_nomba', 'nomba']).default('mock_nomba'),
   /** Log HTTP requests/responses to terminal (default: on in development) */

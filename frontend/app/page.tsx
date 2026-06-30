@@ -18,6 +18,7 @@ import {
 import { Logo } from '@/components/shared/logo';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { paymentModeCopy } from '@/lib/environment';
 import { useCases } from '@/lib/mock-data';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -32,7 +33,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 
 const features = [
   { icon: Target, title: 'Payment Campaigns', desc: 'Create tuition, dues, donations, and event payment campaigns with targets and deadlines.' },
-  { icon: CreditCard, title: 'Dedicated Virtual Accounts', desc: 'Each campaign gets a unique mock virtual account. Ready for Nomba integration from July 1.' },
+  { icon: CreditCard, title: 'Dedicated Virtual Accounts', desc: 'Each campaign gets a unique virtual account for organized bank-transfer collection.' },
   { icon: RefreshCw, title: 'Automatic Reconciliation', desc: 'Incoming bank transfers are matched to campaigns automatically — our core differentiator.' },
   { icon: Users, title: 'Contributor Management', desc: 'Track members, outstanding balances, and payment history across organizations.' },
   { icon: BarChart3, title: 'Reports & Analytics', desc: 'Download payment summaries, outstanding reports, and campaign performance.' },
@@ -87,7 +88,7 @@ export default function LandingPage() {
                 <Link href="/dashboard">View Demo Dashboard</Link>
               </Button>
             </div>
-            <p className="mt-5 text-xs text-slate-400">Mock data mode — live Nomba integration from July 1</p>
+            <p className="mt-5 text-xs text-slate-400">{paymentModeCopy.short}</p>
           </div>
 
           <div className="mx-auto mt-16 grid max-w-4xl gap-4 sm:grid-cols-4">
@@ -178,7 +179,7 @@ export default function LandingPage() {
       <footer className="border-t border-slate-100 bg-slate-50 py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 sm:flex-row">
           <Logo />
-          <p className="text-sm text-muted-foreground">© 2026 ThriveFund. Mock provider mode — Nomba integration July 1.</p>
+          <p className="text-sm text-muted-foreground">© 2026 ThriveFund. {paymentModeCopy.short}.</p>
         </div>
       </footer>
     </div>
