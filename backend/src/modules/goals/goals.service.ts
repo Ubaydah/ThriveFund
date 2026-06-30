@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { Errors } from '../../lib/errors';
 import { logAudit } from '../../lib/audit';
+import { buildContributionUrl } from '../../lib/frontend-url';
 import { getPaymentProvider } from '../../providers/payment';
 import { AuditAction } from '../../shared/types/enums';
 import { goalsRepository } from './goals.repository';
@@ -149,7 +150,7 @@ export const goalsService = {
     if (!goal) throw Errors.notFound('Goal');
     const slug = (goal.slug as string | null) ?? goalId;
     return {
-      public_url: `https://app.thrivefund.ng/g/${slug}`,
+      public_url: buildContributionUrl(slug),
       slug,
       qr_code_url: `https://api.thrivefund.ng/api/v1/goals/${goalId}/qr.png`,
     };

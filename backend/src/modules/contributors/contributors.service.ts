@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { Errors } from '../../lib/errors';
 import { sendEmail, invitationEmail } from '../../lib/email';
-import { env } from '../../config/env';
+import { buildContributionUrl } from '../../lib/frontend-url';
 import { contributorsRepository } from './contributors.repository';
 import { goalsRepository } from '../goals/goals.repository';
 import { usersRepository } from '../users/users.repository';
@@ -43,7 +43,7 @@ export const contributorsService = {
     const inviterName = (inviter?.full_name as string | undefined) ?? 'Someone';
     const goalTitle = goal.title as string;
     const slug = (goal.slug as string | null) ?? goalId;
-    const contributionLink = `${env.FRONTEND_URL}/g/${slug}`;
+    const contributionLink = buildContributionUrl(slug);
 
     return Promise.all(
       body.recipients.map(async (r) => {

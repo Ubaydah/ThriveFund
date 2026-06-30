@@ -567,7 +567,7 @@ Get shareable link and QR code metadata for contributors.
 {
   "success": true,
   "data": {
-    "public_url": "https://app.thrivefund.ng/g/nysc-relocation-fund",
+    "public_url": "http://localhost:3000/c/nysc-relocation-fund",
     "slug": "nysc-relocation-fund",
     "qr_code_url": "https://api.thrivefund.ng/api/v1/goals/goal_01HXYZ/qr.png"
   }
@@ -937,7 +937,7 @@ Manually add a contributor profile (pre-invite).
 
 ### `POST /goals/{id}/invitations`
 
-Send invitation via email or SMS.
+Send invitation via email.
 
 | | |
 |---|---|

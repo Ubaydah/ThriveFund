@@ -98,7 +98,7 @@ NOMBA_WEBHOOK_SECRET=...
 
 ## Known issues
 
-- Share links from API use `https://app.thrivefund.ng/g/` — public pages use `/c/[slug]` locally
+- Share links from API use `FRONTEND_URL/c/[slug]`; set `FRONTEND_URL` to the deployed frontend origin.
 - Admin overview `total_organizations` may be undefined depending on admin repository
 - Email invitations require valid Brevo API key in backend `.env`
 - Rate limit: 100 requests / 15 min on backend

@@ -21,6 +21,6 @@ Contributor profiles and invitation management. Goal-scoped endpoints live insid
 
 ## Notes
 
-- `POST /goals/:id/invitations` body: `{ recipients: [{email, name}], channel: "email"|"sms", message? }`.
-- Email/SMS delivery is handled through the notifications module.
+- `POST /goals/:id/invitations` body: `{ recipients: [{email, name}], channel: "email", message? }`.
+- Email delivery is handled through Brevo.
 - Requires DB tables: `contributors`, `invitations`, `goals`, `transactions`.

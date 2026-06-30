@@ -5,7 +5,7 @@ export const sendInvitationSchema = z.object({
     email: z.string().email(),
     name: z.string().optional(),
   })).min(1),
-  channel: z.enum(['email', 'sms']).default('email'),
+  channel: z.literal('email').default('email'),
   message: z.string().max(500).optional(),
 });
 

@@ -69,7 +69,7 @@ Base path: `/api/v1` · Auth: `Authorization: Bearer <access_token>`
 | GET | `/contributors` | User | List contributors across goals |
 | GET | `/goals/{id}/contributors` | User | Contributors for a goal |
 | POST | `/goals/{id}/contributors` | User | Add contributor profile |
-| POST | `/goals/{id}/invitations` | User | Send email/SMS invitation |
+| POST | `/goals/{id}/invitations` | User | Send email invitation |
 | GET | `/goals/{id}/invitations` | User | List sent invitations |
 
 ## Dashboard & Analytics

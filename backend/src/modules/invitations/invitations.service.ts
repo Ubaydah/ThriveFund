@@ -3,7 +3,7 @@ import { Errors } from '../../lib/errors';
 import { logAudit } from '../../lib/audit';
 import { AuditAction } from '../../shared/types/enums';
 import { sendEmail, invitationEmail } from '../../lib/email';
-import { env } from '../../config/env';
+import { buildContributionUrl } from '../../lib/frontend-url';
 import { invitationsRepository } from './invitations.repository';
 import { goalsRepository } from '../goals/goals.repository';
 import { usersRepository } from '../users/users.repository';
@@ -18,7 +18,7 @@ export const invitationsService = {
     const inviterName = (inviter?.full_name as string | undefined) ?? 'Someone';
     const goalTitle = goal.title as string;
     const slug = (goal.slug as string | null) ?? goalId;
-    const contributionLink = `${env.FRONTEND_URL}/g/${slug}`;
+    const contributionLink = buildContributionUrl(slug);
 
     const results = await Promise.all(
       body.recipients.map(async (r) => {
