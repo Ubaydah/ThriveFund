@@ -34,6 +34,7 @@ Base path: `/api/v1` · Auth: `Authorization: Bearer <access_token>`
 | PATCH | `/goals/{id}` | User | Update goal |
 | DELETE | `/goals/{id}` | User | Delete goal (if no pending txns) |
 | POST | `/goals/{id}/close` | User | Mark goal completed/closed |
+| POST | `/goals/{id}/close-out` | User | Transfer collected funds out and expire virtual account |
 | GET | `/goals/{id}/share` | User | Share link + QR metadata |
 
 ## Virtual Accounts

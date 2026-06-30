@@ -112,6 +112,7 @@ NOMBA_CLIENT_ID=...
 NOMBA_PRIVATE_KEY=...
 NOMBA_PARENT_ACCOUNT_ID=...
 NOMBA_SUB_ACCOUNT_ID=...
+NOMBA_VIRTUAL_ACCOUNT_SCOPE=sub_account
 ```
 
 ## Setup
@@ -146,6 +147,6 @@ See [../docs/api/endpoints.md](../docs/api/endpoints.md)
 
 1. Use `NOMBA_ENVIRONMENT=sandbox` with TEST credentials, or `production` with LIVE credentials.
 2. Authenticate with the parent account ID in `NOMBA_PARENT_ACCOUNT_ID`.
-3. Scope virtual account creation to `NOMBA_SUB_ACCOUNT_ID`.
+3. Use `NOMBA_VIRTUAL_ACCOUNT_SCOPE=sub_account` for `POST /v1/accounts/virtual/{subAccountId}` so collections settle into the configured sub-account.
 4. Set `PAYMENT_PROVIDER=nomba`.
 5. Register webhook URL: `https://api.thrivefund.ng/api/webhooks/nomba`.

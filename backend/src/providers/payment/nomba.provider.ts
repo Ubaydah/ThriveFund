@@ -4,6 +4,9 @@ import { Errors } from '../../lib/errors';
 import { PaymentProviderName } from '../../shared/types/enums';
 import type {
   CreateVirtualAccountRequest,
+  BankTransferRequest,
+  BankTransferResult,
+  ExpireVirtualAccountResult,
   PaymentProvider,
   PaymentWebhookPayload,
   VerifiedPayment,
@@ -34,12 +37,38 @@ type NombaVirtualAccount = {
   bankName?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;
+  accountNumber?: string;
+  virtualAccountNumber?: string;
+  nuban?: string;
+  account?: NombaVirtualAccount;
+  virtualAccount?: NombaVirtualAccount;
   banks?: Array<{
     bankName?: string;
     bankAccountNumber?: string;
     accountNumber?: string;
     accountName?: string;
+    bankAccountName?: string;
+    nuban?: string;
   }>;
+  bank?: {
+    name?: string;
+    bankName?: string;
+    accountNumber?: string;
+    bankAccountNumber?: string;
+    accountName?: string;
+    bankAccountName?: string;
+  };
+};
+
+type NombaBankTransfer = {
+  id?: string;
+  status?: string;
+  amount?: string | number;
+  fee?: number;
+};
+
+type NombaExpireVirtualAccount = {
+  expired?: boolean;
 };
 
 const DEFAULT_BASE_URLS = {
@@ -72,6 +101,22 @@ function buildAccountRef(reference: string): string {
   return `TF-${cleaned}-${Date.now()}`.slice(0, 64);
 }
 
+function unwrapVirtualAccount(response: NombaResponse<NombaVirtualAccount> & NombaVirtualAccount): NombaVirtualAccount {
+  const data = response.data ?? response;
+  return data.account ?? data.virtualAccount ?? data;
+}
+
+function providerAccountId(account: NombaVirtualAccount, fallback: string): string {
+  return account.accountId ?? account.id ?? account.accountHolderId ?? fallback;
+}
+
+function transferStatus(status: string | undefined): BankTransferResult['status'] {
+  const normalized = (status ?? '').toLowerCase();
+  if (['success', 'successful'].includes(normalized)) return 'successful';
+  if (['processing', 'pending', 'pending_billing'].includes(normalized)) return 'processing';
+  return 'failed';
+}
+
 export class NombaProvider implements PaymentProvider {
   readonly name = PaymentProviderName.Nomba;
 
@@ -86,34 +131,53 @@ export class NombaProvider implements PaymentProvider {
     'NOMBA_PARENT_ACCOUNT_ID',
     env.NOMBA_PARENT_ACCOUNT_ID ?? env.NOMBA_ACCOUNT_ID,
   );
-  private readonly subAccountId = requiredEnv('NOMBA_SUB_ACCOUNT_ID', env.NOMBA_SUB_ACCOUNT_ID);
+  private readonly subAccountId = env.NOMBA_SUB_ACCOUNT_ID;
 
   async createVirtualAccount(request: CreateVirtualAccountRequest): Promise<VirtualAccountResult> {
     const accountRef = buildAccountRef(request.reference);
-    const response = await this.request<NombaVirtualAccount>(
-      `/v1/accounts/virtual/${encodeURIComponent(this.subAccountId)}`,
-      {
-        method: 'POST',
-        body: {
-          accountRef,
-          accountName: request.accountName.slice(0, 64),
-        },
-      },
-    );
+    const path =
+      env.NOMBA_VIRTUAL_ACCOUNT_SCOPE === 'sub_account'
+        ? `/v1/accounts/virtual/${encodeURIComponent(requiredEnv('NOMBA_SUB_ACCOUNT_ID', this.subAccountId))}`
+        : '/v1/accounts/virtual';
 
-    const account = response.data ?? response as NombaVirtualAccount;
+    const response = await this.request<NombaVirtualAccount>(path, {
+      method: 'POST',
+      body: {
+        accountRef,
+        accountName: request.accountName.slice(0, 64),
+      },
+    });
+
+    const account = unwrapVirtualAccount(response);
     const bank = account.banks?.[0];
-    const accountNumber = account.bankAccountNumber ?? bank?.bankAccountNumber ?? bank?.accountNumber;
-    const bankName = account.bankName ?? bank?.bankName;
-    const bankAccountName = account.bankAccountName ?? bank?.accountName ?? account.accountName;
+    const accountNumber =
+      account.bankAccountNumber ??
+      account.accountNumber ??
+      account.virtualAccountNumber ??
+      account.nuban ??
+      bank?.bankAccountNumber ??
+      bank?.accountNumber ??
+      bank?.nuban ??
+      account.bank?.bankAccountNumber ??
+      account.bank?.accountNumber;
+    const bankName = account.bankName ?? bank?.bankName ?? account.bank?.bankName ?? account.bank?.name;
+    const bankAccountName =
+      account.bankAccountName ??
+      bank?.bankAccountName ??
+      bank?.accountName ??
+      account.bank?.bankAccountName ??
+      account.bank?.accountName ??
+      account.accountName;
 
     if (!accountNumber || !bankName || !bankAccountName) {
-      throw Errors.provider('Nomba virtual account response did not include bank details');
+      throw Errors.provider(
+        `Nomba virtual account response did not include bank details. accountRef=${account.accountRef ?? accountRef}`,
+      );
     }
 
     return {
       provider: PaymentProviderName.Nomba,
-      providerAccountId: account.accountId ?? account.id ?? account.accountHolderId ?? this.subAccountId,
+      providerAccountId: providerAccountId(account, this.subAccountId ?? this.parentAccountId),
       accountNumber,
       accountName: bankAccountName,
       bankName,
@@ -140,6 +204,49 @@ export class NombaProvider implements PaymentProvider {
     };
   }
 
+  async transferToBank(request: BankTransferRequest): Promise<BankTransferResult> {
+    const path =
+      env.NOMBA_VIRTUAL_ACCOUNT_SCOPE === 'sub_account'
+        ? `/v2/transfers/bank/${encodeURIComponent(requiredEnv('NOMBA_SUB_ACCOUNT_ID', this.subAccountId))}`
+        : '/v2/transfers/bank';
+    const response = await this.request<NombaBankTransfer>(path, {
+      method: 'POST',
+      body: {
+        amount: request.amount,
+        accountNumber: request.accountNumber,
+        accountName: request.accountName,
+        bankCode: request.bankCode,
+        merchantTxRef: request.merchantTxRef,
+        ...(request.senderName ? { senderName: request.senderName } : {}),
+        ...(request.narration ? { narration: request.narration } : {}),
+      },
+    });
+
+    const transfer = response.data ?? response;
+    return {
+      provider: PaymentProviderName.Nomba,
+      providerReference: transfer.id ?? request.merchantTxRef,
+      status: transferStatus(transfer.status ?? response.description),
+      amount: Number(transfer.amount ?? request.amount),
+      fee: transfer.fee,
+      raw: response,
+    };
+  }
+
+  async expireVirtualAccount(identifier: string): Promise<ExpireVirtualAccountResult> {
+    const response = await this.request<NombaExpireVirtualAccount>(
+      `/v1/accounts/virtual/${encodeURIComponent(identifier)}`,
+      { method: 'DELETE' },
+    );
+    const data = response.data ?? response;
+    return {
+      provider: PaymentProviderName.Nomba,
+      expired: Boolean(data.expired),
+      providerReference: identifier,
+      raw: response,
+    };
+  }
+
   validateWebhookSignature(rawBody: string, signature: string): boolean {
     if (!env.NOMBA_WEBHOOK_SECRET) return false;
 
@@ -158,7 +265,11 @@ export class NombaProvider implements PaymentProvider {
 
   async healthCheck() {
     try {
-      await this.request('/v1/accounts/balance', { method: 'GET' });
+      const path =
+        env.NOMBA_VIRTUAL_ACCOUNT_SCOPE === 'sub_account'
+          ? `/v1/accounts/${encodeURIComponent(requiredEnv('NOMBA_SUB_ACCOUNT_ID', this.subAccountId))}/balance`
+          : '/v1/accounts/balance';
+      await this.request(path, { method: 'GET' });
       return { status: 'ok' as const, message: `Nomba ${env.NOMBA_ENVIRONMENT} API reachable` };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Nomba health check failed';

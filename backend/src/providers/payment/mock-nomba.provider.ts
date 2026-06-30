@@ -4,6 +4,9 @@ import { env } from '../../config/env';
 import { PaymentProviderName } from '../../shared/types/enums';
 import type {
   CreateVirtualAccountRequest,
+  BankTransferRequest,
+  BankTransferResult,
+  ExpireVirtualAccountResult,
   PaymentProvider,
   PaymentWebhookPayload,
   VerifiedPayment,
@@ -58,6 +61,30 @@ export class MockNombaProvider implements PaymentProvider {
       status: mapStatus(payload.status),
       paidAt: new Date(payload.paidAt || Date.now()),
       bankName: payload.bankName,
+    };
+  }
+
+  async transferToBank(request: BankTransferRequest): Promise<BankTransferResult> {
+    return {
+      provider: PaymentProviderName.MockNomba,
+      providerReference: request.merchantTxRef,
+      status: 'successful',
+      amount: request.amount,
+      fee: 0,
+      raw: {
+        id: `mock_transfer_${uuid().replace(/-/g, '').slice(0, 12)}`,
+        destination: request.accountNumber,
+        bankCode: request.bankCode,
+      },
+    };
+  }
+
+  async expireVirtualAccount(identifier: string): Promise<ExpireVirtualAccountResult> {
+    return {
+      provider: PaymentProviderName.MockNomba,
+      expired: true,
+      providerReference: identifier,
+      raw: { expired: true },
     };
   }
 

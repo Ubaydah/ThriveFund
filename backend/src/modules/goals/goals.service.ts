@@ -1,9 +1,13 @@
 import { v4 as uuid } from 'uuid';
 import { Errors } from '../../lib/errors';
+import { logAudit } from '../../lib/audit';
+import { getPaymentProvider } from '../../providers/payment';
+import { AuditAction } from '../../shared/types/enums';
 import { goalsRepository } from './goals.repository';
 import { transactionsRepository } from '../transactions/transactions.repository';
 import { organizationsRepository } from '../organizations/organizations.repository';
-import type { CreateGoalInput, UpdateGoalInput } from './goals.schema';
+import { virtualAccountsRepository } from '../virtual-accounts/virtual-accounts.repository';
+import type { CreateGoalInput, UpdateGoalInput, CloseOutGoalInput } from './goals.schema';
 
 export const goalsService = {
   async create(userId: string, body: CreateGoalInput) {
@@ -67,6 +71,68 @@ export const goalsService = {
     const goal = await goalsRepository.updateStatus(goalId, userId, 'completed');
     if (!goal) throw Errors.notFound('Goal');
     return goal;
+  },
+
+  async closeOut(userId: string, goalId: string, body: CloseOutGoalInput) {
+    const goal = await goalsRepository.findByIdRaw(goalId, userId);
+    if (!goal) throw Errors.notFound('Goal');
+
+    const currentAmount = Number(goal.current_amount);
+    const targetAmount = Number(goal.target_amount);
+    if ((goal.status as string) !== 'completed' && currentAmount < targetAmount) {
+      throw Errors.conflict('Campaign target is not complete yet');
+    }
+
+    const va = await virtualAccountsRepository.findByGoalAndUser(goalId, userId);
+    if (!va) throw Errors.notFound('Active virtual account');
+
+    const amount = body.amount ?? currentAmount;
+    if (amount > currentAmount) {
+      throw Errors.validation('Transfer amount cannot exceed campaign balance');
+    }
+
+    const provider = getPaymentProvider();
+    const merchantTxRef = `TF-OUT-${goalId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 40)}`.slice(0, 64);
+    const transfer = await provider.transferToBank({
+      amount,
+      accountNumber: body.account_number,
+      accountName: body.account_name,
+      bankCode: body.bank_code,
+      merchantTxRef,
+      senderName: 'ThriveFund',
+      narration: body.narration ?? `ThriveFund payout - ${goal.title as string}`,
+    });
+
+    const expireIdentifier = (va.provider_reference as string) || (va.account_number as string);
+    const expiry = await provider.expireVirtualAccount(expireIdentifier);
+    const updatedVa = await virtualAccountsRepository.markInactive(va.id as string);
+    const updatedGoal = await goalsRepository.updateStatus(goalId, userId, 'completed');
+
+    await logAudit({
+      action: AuditAction.GoalClosedOut,
+      actor_id: userId,
+      organization_id: goal.organization_id as string | null,
+      resource_type: 'goal',
+      resource_id: goalId,
+      metadata: {
+        virtual_account_id: va.id,
+        transfer_provider_reference: transfer.providerReference,
+        transfer_status: transfer.status,
+        transfer_amount: transfer.amount,
+        transfer_fee: transfer.fee,
+        expired_virtual_account: expiry.expired,
+      },
+    });
+
+    const { raw: _transferRaw, ...transferResponse } = transfer;
+    const { raw: _expiryRaw, ...expiryResponse } = expiry;
+
+    return {
+      goal: updatedGoal,
+      virtual_account: updatedVa,
+      transfer: transferResponse,
+      expiry: expiryResponse,
+    };
   },
 
   async getShareLink(userId: string, goalId: string) {

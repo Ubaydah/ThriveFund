@@ -42,6 +42,32 @@ export interface VerifiedPayment {
   bankName?: string;
 }
 
+export interface BankTransferRequest {
+  amount: number;
+  accountNumber: string;
+  accountName: string;
+  bankCode: string;
+  merchantTxRef: string;
+  senderName?: string;
+  narration?: string;
+}
+
+export interface BankTransferResult {
+  provider: PaymentProviderName;
+  providerReference: string;
+  status: 'successful' | 'processing' | 'failed';
+  amount: number;
+  fee?: number;
+  raw?: unknown;
+}
+
+export interface ExpireVirtualAccountResult {
+  provider: PaymentProviderName;
+  expired: boolean;
+  providerReference: string;
+  raw?: unknown;
+}
+
 export interface PaymentProvider {
   readonly name: PaymentProviderName;
 
@@ -50,6 +76,12 @@ export interface PaymentProvider {
 
   /** Normalize and verify an incoming payment webhook payload */
   verifyPayment(payload: PaymentWebhookPayload): Promise<VerifiedPayment>;
+
+  /** Transfer funds from the configured provider account to an external bank account. */
+  transferToBank(request: BankTransferRequest): Promise<BankTransferResult>;
+
+  /** Expire a dedicated virtual account by provider reference/account number. */
+  expireVirtualAccount(identifier: string): Promise<ExpireVirtualAccountResult>;
 
   /** Validate webhook signature — returns true in mock mode when secret unset */
   validateWebhookSignature(rawBody: string, signature: string): boolean;

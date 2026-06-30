@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ok, created, noContent } from '../../lib/response';
 import { goalsService } from './goals.service';
-import { createGoalSchema, updateGoalSchema } from './goals.schema';
+import { closeOutGoalSchema, createGoalSchema, updateGoalSchema } from './goals.schema';
 
 export const goalsController = {
   async create(req: Request, res: Response, next: NextFunction) {
@@ -50,6 +50,14 @@ export const goalsController = {
   async close(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await goalsService.close(req.user!.sub, req.params.id);
+      ok(res, data);
+    } catch (err) { next(err); }
+  },
+
+  async closeOut(req: Request, res: Response, next: NextFunction) {
+    try {
+      const body = closeOutGoalSchema.parse(req.body);
+      const data = await goalsService.closeOut(req.user!.sub, req.params.id, body);
       ok(res, data);
     } catch (err) { next(err); }
   },

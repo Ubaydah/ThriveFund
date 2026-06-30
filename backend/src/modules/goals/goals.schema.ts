@@ -12,5 +12,14 @@ export const createGoalSchema = z.object({
 
 export const updateGoalSchema = createGoalSchema.partial();
 
+export const closeOutGoalSchema = z.object({
+  account_number: z.string().regex(/^\d{10}$/, 'Use a 10 digit destination account number'),
+  account_name: z.string().min(2).max(255),
+  bank_code: z.string().min(2).max(20),
+  amount: z.number().positive().optional(),
+  narration: z.string().max(120).optional(),
+});
+
 export type CreateGoalInput = z.infer<typeof createGoalSchema>;
 export type UpdateGoalInput = z.infer<typeof updateGoalSchema>;
+export type CloseOutGoalInput = z.infer<typeof closeOutGoalSchema>;

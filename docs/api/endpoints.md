@@ -638,6 +638,65 @@ Get virtual account details for a goal.
 
 ---
 
+### `POST /goals/{id}/close-out`
+
+Transfer collected funds to a destination bank account, expire the linked Nomba virtual account, mark the virtual account inactive, and mark the goal completed.
+
+| | |
+|---|---|
+| **Auth** | Owner |
+| **Frontend** | Campaign detail → Close out |
+| **Provider calls** | Nomba bank transfer + expire virtual account |
+
+**Request body:**
+
+```json
+{
+  "account_number": "0123456789",
+  "account_name": "Adebayo Adeyemi",
+  "bank_code": "058",
+  "amount": 50000,
+  "narration": "Campaign payout"
+}
+```
+
+`amount` is optional; when omitted, the current campaign balance is transferred.
+
+**Response `200`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "goal": { "id": "goal_01HXYZ", "status": "completed" },
+    "virtual_account": { "id": "va_01HXYZ", "status": "inactive" },
+    "transfer": {
+      "provider": "nomba",
+      "providerReference": "API-TRANSFER-...",
+      "status": "processing",
+      "amount": 50000,
+      "fee": 50
+    },
+    "expiry": {
+      "provider": "nomba",
+      "expired": true,
+      "providerReference": "TF-goal_01HXYZ..."
+    }
+  }
+}
+```
+
+**Errors:**
+
+| Code | When |
+|------|------|
+| `404` | Goal or active virtual account not found |
+| `409` | Campaign target is not complete yet |
+| `422` | Transfer amount exceeds campaign balance |
+| `502` | Nomba transfer or expiry API failure |
+
+---
+
 ### `GET /virtual-accounts`
 
 List all virtual accounts across user's goals.
@@ -1396,8 +1455,11 @@ These are **outbound calls** from the ThriveFund backend to Nomba. Document in i
 
 | Action | Nomba API (consult docs) | Triggered by |
 |--------|--------------------------|--------------|
-| Create virtual account | Nomba virtual account creation endpoint | `POST /goals/{id}/virtual-account` |
-| Verify account status | Nomba account status endpoint | Admin / cron |
+| Authenticate | `POST /v1/auth/token/issue` | Provider token cache |
+| Create virtual account for sub-account | `POST /v1/accounts/virtual/{subAccountId}` | `POST /goals/{id}/virtual-account` |
+| Fetch sub-account balance | `GET /v1/accounts/{subAccountId}/balance` | Health/readiness |
+| Transfer to bank from sub-account | `POST /v2/transfers/bank/{subAccountId}` | `POST /goals/{id}/close-out` |
+| Expire virtual account | `DELETE /v1/accounts/virtual/{identifier}` | `POST /goals/{id}/close-out` |
 | Webhook registration | Nomba dashboard / API | Deployment setup |
 
 ---

@@ -93,7 +93,7 @@ export const goalsRepository = {
 
   async findByIdRaw(goalId: string, userId: string): Promise<GoalRow | null> {
     const rows = await query<GoalRow>(
-      'SELECT id, slug, title FROM goals WHERE id = ? AND user_id = ?',
+      'SELECT id, slug, title, organization_id, target_amount, current_amount, status FROM goals WHERE id = ? AND user_id = ?',
       [goalId, userId],
     );
     return rows[0] ?? null;

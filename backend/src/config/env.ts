@@ -35,6 +35,7 @@ const schema = z.object({
   NOMBA_CLIENT_SECRET: z.string().optional(),
   NOMBA_PARENT_ACCOUNT_ID: z.string().optional(),
   NOMBA_SUB_ACCOUNT_ID: z.string().optional(),
+  NOMBA_VIRTUAL_ACCOUNT_SCOPE: z.enum(['parent', 'sub_account']).default('parent'),
   /** Legacy aliases kept so older deployments fail less sharply during rollout. */
   NOMBA_API_KEY: z.string().optional(),
   NOMBA_ACCOUNT_ID: z.string().optional(),
@@ -46,8 +47,11 @@ const schema = z.object({
     ['NOMBA_CLIENT_ID', Boolean(data.NOMBA_CLIENT_ID)],
     ['NOMBA_PRIVATE_KEY', Boolean(data.NOMBA_PRIVATE_KEY || data.NOMBA_CLIENT_SECRET || data.NOMBA_API_KEY)],
     ['NOMBA_PARENT_ACCOUNT_ID', Boolean(data.NOMBA_PARENT_ACCOUNT_ID || data.NOMBA_ACCOUNT_ID)],
-    ['NOMBA_SUB_ACCOUNT_ID', Boolean(data.NOMBA_SUB_ACCOUNT_ID)],
   ];
+
+  if (data.NOMBA_VIRTUAL_ACCOUNT_SCOPE === 'sub_account') {
+    required.push(['NOMBA_SUB_ACCOUNT_ID', Boolean(data.NOMBA_SUB_ACCOUNT_ID)]);
+  }
 
   for (const [field, present] of required) {
     if (!present) {

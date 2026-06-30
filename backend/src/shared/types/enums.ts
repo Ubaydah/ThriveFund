@@ -84,6 +84,7 @@ export enum AuditAction {
   UserLogin = 'user.login',
   GoalCreated = 'goal.created',
   GoalUpdated = 'goal.updated',
+  GoalClosedOut = 'goal.closed_out',
   VirtualAccountCreated = 'virtual_account.created',
   PaymentReceived = 'payment.received',
   PaymentVerified = 'payment.verified',
