@@ -29,17 +29,17 @@ Modular monolith — each module owns one domain. Cross-module calls go through 
 | notifications | In-app + Brevo emails | Payment logic |
 | reports | Aggregations, CSV | Write data |
 
-## Payment Provider (Pre–July 1)
+## Payment Provider
 
 ```typescript
 // src/providers/payment/index.ts
-getPaymentProvider() → MockNombaProvider | NombaProvider (placeholder)
+getPaymentProvider() → MockNombaProvider | NombaProvider
 ```
 
 | Provider | Status |
 |----------|--------|
 | `MockNombaProvider` | ✅ Active — generates mock VAs, verifies mock webhooks |
-| `NombaProvider` | ⬜ Placeholder — throws until hackathon build phase |
+| `NombaProvider` | ✅ Active when `PAYMENT_PROVIDER=nomba` and Nomba credentials are configured |
 
 ## New API Routes
 
@@ -67,7 +67,7 @@ See `src/shared/types/enums.ts` for all status values.
 1. `POST /auth/register` or use seed user `adebayo@thrivefund.ng` / `DemoPass123!`
 2. `POST /organizations` — create mosque/school org
 3. `POST /goals` — create campaign linked to org
-4. `POST /goals/:id/virtual-account` — MockNombaProvider returns account number
+4. `POST /goals/:id/virtual-account` — PaymentProvider returns account number
 5. `POST /api/webhooks/mock/simulate` — simulate payment
 6. `GET /reconciliation/overview` — see matched payments
 7. `GET /reports/financial-summary` — totals

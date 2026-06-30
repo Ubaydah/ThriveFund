@@ -9,33 +9,51 @@ import { paymentsService } from '../payments/payments.service';
 import { reconciliationService } from '../reconciliation/reconciliation.service';
 
 interface NombaPayload {
-  event: string;
-  data: {
-    account_number: string;
-    amount: number;
-    currency: string;
-    payer_name?: string;
-    reference: string;
-    provider_reference: string;
-    status: string;
-    paid_at: string;
-    bank_name?: string;
-  };
+  event?: string;
+  eventType?: string;
+  type?: string;
+  data?: Record<string, unknown>;
 }
 
 function toProviderPayload(payload: NombaPayload): PaymentWebhookPayload {
+  const data = payload.data ?? {};
+  const accountNumber = stringFrom(data.account_number, data.accountNumber, data.bankAccountNumber);
+  const providerReference = stringFrom(
+    data.provider_reference,
+    data.providerReference,
+    data.transactionId,
+    data.sessionId,
+    data.id,
+  );
+
   return {
-    event: payload.event,
-    accountNumber: payload.data.account_number,
-    amount: payload.data.amount,
-    currency: payload.data.currency || 'NGN',
-    payerName: payload.data.payer_name,
-    reference: payload.data.reference,
-    providerReference: payload.data.provider_reference,
-    status: payload.data.status,
-    paidAt: payload.data.paid_at,
-    bankName: payload.data.bank_name,
+    event: payload.event ?? payload.eventType ?? payload.type ?? 'payment.received',
+    accountNumber,
+    amount: numberFrom(data.amount, data.paymentAmount),
+    currency: stringFrom(data.currency) || 'NGN',
+    payerName: stringFrom(data.payer_name, data.payerName, data.senderName, data.customerName),
+    reference: stringFrom(data.reference, data.accountRef, data.merchantReference) || providerReference,
+    providerReference,
+    status: stringFrom(data.status, data.transactionStatus) || 'pending',
+    paidAt: stringFrom(data.paid_at, data.paidAt, data.createdAt, data.date) || new Date().toISOString(),
+    bankName: stringFrom(data.bank_name, data.bankName, data.sourceBankName),
   };
+}
+
+function stringFrom(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return '';
+}
+
+function numberFrom(...values: unknown[]): number {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  }
+  return 0;
 }
 
 export const webhooksService = {
@@ -52,10 +70,16 @@ export const webhooksService = {
       throw Errors.unauthorized('Invalid webhook signature');
     }
 
+    const providerPayload = toProviderPayload(payload);
+    if (!providerPayload.providerReference || !providerPayload.accountNumber) {
+      throw Errors.validation('Nomba webhook payload is missing transaction or account details');
+    }
+
     const event = await webhooksRepository.insertEvent({
       id: `wh_${uuid().replace(/-/g, '').slice(0, 12)}`,
-      event_type: payload.event,
-      provider_reference: payload.data.provider_reference,
+      provider: provider.name,
+      event_type: providerPayload.event,
+      provider_reference: providerPayload.providerReference,
       payload: rawBody,
     });
 
@@ -67,11 +91,10 @@ export const webhooksService = {
       action: AuditAction.WebhookReceived,
       resource_type: 'webhook_event',
       resource_id: event.id as string,
-      metadata: { provider_reference: payload.data.provider_reference },
+      metadata: { provider_reference: providerPayload.providerReference },
     });
 
     try {
-      const providerPayload = toProviderPayload(payload);
       const { payment, duplicate } = await paymentsService.ingestFromWebhook(
         event.id as string,
         providerPayload,
@@ -101,7 +124,7 @@ export const webhooksService = {
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Processing failed';
-      await webhooksRepository.markFailed(payload.data.provider_reference, message);
+      await webhooksRepository.markFailed(providerPayload.providerReference, message);
       throw err;
     }
   },

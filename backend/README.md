@@ -2,7 +2,7 @@
 
 Node.js + TypeScript + Express modular monolith for payment collection and reconciliation using **Dedicated Virtual Accounts**.
 
-> **Local/demo mode:** No live Nomba API calls are made while `PAYMENT_PROVIDER=mock_nomba` is active. Real provider calls belong behind `NombaProvider`.
+> **Local/demo mode:** No live Nomba API calls are made while `PAYMENT_PROVIDER=mock_nomba` is active. Set `PAYMENT_PROVIDER=nomba` only when Nomba credentials are configured.
 
 ## Stack
 
@@ -32,8 +32,8 @@ backend/
 │   ├── providers/
 │   │   └── payment/        # PaymentProvider abstraction
 │   │       ├── payment-provider.interface.ts
-│   │       ├── mock-nomba.provider.ts   ← active now
-│   │       └── nomba.provider.ts          ← placeholder
+│   │       ├── mock-nomba.provider.ts
+│   │       └── nomba.provider.ts
 │   ├── shared/
 │   │   ├── types/enums.ts
 │   │   └── utils/pagination.ts
@@ -52,7 +52,7 @@ Each module follows: `controller` · `service` · `repository` · `routes` · `v
 | **organizations** | Schools, mosques, NGOs, businesses |
 | **organization-members** | Team roles (owner, admin, treasurer, viewer) |
 | **goals** | Campaigns / collection goals |
-| **virtual-accounts** | Mock VA generation via PaymentProvider |
+| **virtual-accounts** | Dedicated VA generation via PaymentProvider |
 | **webhooks** | Receive + validate webhook events only |
 | **payments** | Provider verification, payment records |
 | **reconciliation** | Match payments → goals → transactions |
@@ -78,7 +78,7 @@ POST /api/webhooks/nomba  (or /mock/simulate in dev)
        ↓
 webhooks module     → store webhook_events
        ↓
-payments module     → MockNombaProvider.verifyPayment() → payments table
+payments module     → PaymentProvider.verifyPayment() → payments table
        ↓
 reconciliation      → match VA → goal → create transaction
        ↓
@@ -105,6 +105,13 @@ CORS_ORIGIN=http://localhost:3000
 # Payment provider — use mock_nomba for local/demo flows
 PAYMENT_PROVIDER=mock_nomba
 NOMBA_WEBHOOK_SECRET=dev-secret   # optional for mock signature validation
+
+# Required when PAYMENT_PROVIDER=nomba
+NOMBA_ENVIRONMENT=sandbox
+NOMBA_CLIENT_ID=...
+NOMBA_PRIVATE_KEY=...
+NOMBA_PARENT_ACCOUNT_ID=...
+NOMBA_SUB_ACCOUNT_ID=...
 ```
 
 ## Setup
@@ -137,9 +144,8 @@ See [../docs/api/endpoints.md](../docs/api/endpoints.md)
 
 ## Nomba Integration
 
-1. Implement `NombaProvider.createVirtualAccount()` with real Nomba API
-2. Implement `NombaProvider.verifyPayment()` with Nomba webhook schema
-3. Set `PAYMENT_PROVIDER=nomba` and configure `NOMBA_API_KEY`, `NOMBA_BASE_URL`
-4. Register webhook URL: `https://api.thrivefund.ng/api/webhooks/nomba`
-
-Do **not** call real Nomba endpoints before the hackathon build phase.
+1. Use `NOMBA_ENVIRONMENT=sandbox` with TEST credentials, or `production` with LIVE credentials.
+2. Authenticate with the parent account ID in `NOMBA_PARENT_ACCOUNT_ID`.
+3. Scope virtual account creation to `NOMBA_SUB_ACCOUNT_ID`.
+4. Set `PAYMENT_PROVIDER=nomba`.
+5. Register webhook URL: `https://api.thrivefund.ng/api/webhooks/nomba`.

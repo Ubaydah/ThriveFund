@@ -7,10 +7,10 @@ Handles payment verification via the **PaymentProvider** abstraction. Does not r
 ```
 PaymentProvider (interface)
 ├── MockNombaProvider  ← active for local/demo flows (default)
-└── NombaProvider      ← placeholder, throws until hackathon build phase
+└── NombaProvider      ← active when Nomba credentials are configured
 ```
 
-Set `PAYMENT_PROVIDER=mock_nomba` in `.env` (default).
+Set `PAYMENT_PROVIDER=mock_nomba` in `.env` for local/demo flows, or `PAYMENT_PROVIDER=nomba` with Nomba credentials for sandbox/live calls.
 
 ## Flow
 
