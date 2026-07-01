@@ -45,7 +45,7 @@ export default function NewCampaignPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.organization_id) {
-      toast.error('Choose an organization for this campaign');
+      toast.error('Choose an organization for this collection');
       return;
     }
     try {
@@ -57,7 +57,7 @@ export default function NewCampaignPage() {
         category: form.category,
         deadline: form.deadline,
       });
-      toast.success('Campaign created');
+      toast.success('Collection created');
       router.push(`/dashboard/campaigns/${res.data.id}`);
     } catch (err) {
       toast.error(getAuthErrorMessage(err));
@@ -71,7 +71,7 @@ export default function NewCampaignPage() {
       <Button variant="ghost" size="sm" className="mb-4" asChild>
         <Link href="/dashboard/campaigns"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
       </Button>
-      <PageHeader title="Create Campaign" description="Set up a new payment collection campaign" />
+      <PageHeader title="Create Collection" description="Set up tuition, dues, levies, donations, or event payments" />
 
       {!organizations?.length ? (
         <Card className="max-w-2xl border-primary/30">
@@ -81,7 +81,7 @@ export default function NewCampaignPage() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Create an organization first</h2>
             <p className="mb-5 text-sm text-muted-foreground">
-              Campaigns belong to an organization so collections, contributors, and reconciliation stay grouped correctly.
+              Collections belong to an organization so members, students, contributors, and reconciliation stay grouped correctly.
             </p>
             <Button asChild>
               <Link href="/dashboard/organizations">Create Organization</Link>
@@ -111,7 +111,7 @@ export default function NewCampaignPage() {
             </Select>
             <Input type="number" placeholder="Target amount (₦)" value={form.target_amount} onChange={(e) => setForm({ ...form, target_amount: e.target.value })} required min={1} />
             <Input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} required />
-            <Button type="submit" className="w-full" disabled={createGoal.isPending || !form.organization_id}>{createGoal.isPending ? 'Creating...' : 'Create Campaign'}</Button>
+            <Button type="submit" className="w-full" disabled={createGoal.isPending || !form.organization_id}>{createGoal.isPending ? 'Creating...' : 'Create Collection'}</Button>
           </form>
         </CardContent>
       </Card>

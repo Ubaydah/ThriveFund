@@ -19,37 +19,39 @@ export const invitationsService = {
     const goalTitle = goal.title as string;
     const slug = (goal.slug as string | null) ?? goalId;
     const contributionLink = buildContributionUrl(slug);
-
-    const results = await Promise.all(
-      body.recipients.map(async (r) => {
-        const token = uuid().slice(0, 16);
-        const saved = await invitationsRepository.insert({
-          id: `inv_${uuid().replace(/-/g, '').slice(0, 12)}`,
-          goal_id: goalId,
-          invited_by: userId,
-          email: r.email,
-          name: r.name,
-          channel: body.channel,
-          token,
-          message: body.message,
-        });
-
-        if (body.channel === 'email') {
-          const { subject, html } = invitationEmail(goalTitle, inviterName, contributionLink, body.message);
-          await sendEmail({ to: { email: r.email, name: r.name }, subject, html });
-        }
-
-        await logAudit({
-          action: AuditAction.InvitationSent,
-          actor_id: userId,
-          resource_type: 'invitation',
-          resource_id: saved.id as string,
-          metadata: { goal_id: goalId, email: r.email },
-        });
-
-        return saved;
-      }),
+    const uniqueRecipients = Array.from(
+      new Map(body.recipients.map((r) => [r.email.trim().toLowerCase(), r])).values(),
     );
+
+    const results = [];
+
+    for (const r of uniqueRecipients) {
+      const token = uuid().slice(0, 16);
+      const email = r.email.trim().toLowerCase();
+      const saved = await invitationsRepository.insert({
+        id: `inv_${uuid().replace(/-/g, '').slice(0, 12)}`,
+        goal_id: goalId,
+        invited_by: userId,
+        email,
+        name: r.name?.trim() || undefined,
+        channel: body.channel,
+        token,
+        message: body.message,
+      });
+
+      const { subject, html } = invitationEmail(goalTitle, inviterName, contributionLink, body.message);
+      await sendEmail({ to: { email, name: r.name }, subject, html });
+
+      await logAudit({
+        action: AuditAction.InvitationSent,
+        actor_id: userId,
+        resource_type: 'invitation',
+        resource_id: saved.id as string,
+        metadata: { goal_id: goalId, email },
+      });
+
+      results.push(saved);
+    }
 
     return results;
   },

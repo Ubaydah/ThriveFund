@@ -37,7 +37,7 @@ export default function DashboardPage() {
       <PageHeader
         title="Organization Dashboard"
         description="Payment collection and reconciliation overview"
-        action={<Button asChild><Link href="/dashboard/campaigns/new">New Campaign</Link></Button>}
+        action={<Button asChild><Link href="/dashboard/campaigns/new">New Collection</Link></Button>}
       />
 
       {(!hasOrganizations || !hasCampaigns || firstCampaign) && (
@@ -51,7 +51,7 @@ export default function DashboardPage() {
               {!hasOrganizations ? (
                 <Button asChild><Link href="/dashboard/organizations">Create Organization</Link></Button>
               ) : !hasCampaigns ? (
-                <Button asChild><Link href="/dashboard/campaigns/new">Create Campaign</Link></Button>
+                <Button asChild><Link href="/dashboard/campaigns/new">Create Collection</Link></Button>
               ) : (
                 <Button variant="outline" asChild><Link href={`/dashboard/campaigns/${firstCampaign.id}`}>Continue Setup</Link></Button>
               )}

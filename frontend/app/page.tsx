@@ -31,18 +31,18 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 const features = [
-  { icon: Target, title: 'Payment Campaigns', desc: 'Create tuition, dues, donations, and event payment campaigns with targets and deadlines.' },
-  { icon: CreditCard, title: 'Dedicated Virtual Accounts', desc: 'Each campaign gets a unique virtual account for organized bank-transfer collection.' },
-  { icon: RefreshCw, title: 'Automatic Reconciliation', desc: 'Incoming bank transfers are matched to campaigns automatically — our core differentiator.' },
+  { icon: Target, title: 'Structured Collections', desc: 'Create tuition, dues, levies, donations, and event payment collections with targets and deadlines.' },
+  { icon: CreditCard, title: 'Dedicated Virtual Accounts', desc: 'Each collection gets a unique virtual account for organized bank-transfer collection.' },
+  { icon: RefreshCw, title: 'Automatic Reconciliation', desc: 'Incoming bank transfers are matched to collections automatically — our core differentiator.' },
   { icon: Users, title: 'Contributor Management', desc: 'Track members, outstanding balances, and payment history across organizations.' },
-  { icon: BarChart3, title: 'Reports & Analytics', desc: 'Download payment summaries, outstanding reports, and campaign performance.' },
+  { icon: BarChart3, title: 'Reports & Analytics', desc: 'Download payment summaries, outstanding reports, and collection performance.' },
   { icon: Shield, title: 'Bank-Grade Security', desc: 'Encrypted transactions and role-based access for organization admins.' },
 ];
 
 const steps = [
   { n: '01', title: 'Create Organization', desc: 'Set up your school, mosque, cooperative, or NGO on ThriveFund.' },
-  { n: '02', title: 'Launch Campaign', desc: 'Define a payment campaign — fees, dues, donations, or event payments.' },
-  { n: '03', title: 'Get Virtual Account', desc: 'Receive a dedicated account number for contributors to pay into.' },
+  { n: '02', title: 'Create Collection', desc: 'Define a payment collection — fees, dues, tuition, levies, or event payments.' },
+  { n: '03', title: 'Get Virtual Account', desc: 'Receive a dedicated account number for members, students, parents, or contributors to pay into.' },
   { n: '04', title: 'Auto-Reconcile', desc: 'Payments are matched and recorded automatically. Review exceptions in one place.' },
 ];
 
@@ -76,7 +76,7 @@ export default function LandingPage() {
               <span className="text-primary">Reconcile automatically.</span>
             </h1>
             <p className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-slate-600">
-              ThriveFund helps schools, mosques, cooperatives, NGOs, and businesses create payment campaigns,
+              ThriveFund helps schools, mosques, cooperatives, NGOs, and businesses create structured payment collections,
               assign dedicated virtual accounts, and automatically reconcile incoming bank transfers — no spreadsheets required.
             </p>
             <div className="flex flex-col justify-center gap-4 sm:flex-row">
@@ -111,7 +111,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="mb-4 text-center text-3xl font-bold text-thrive-dark">Built for every organization</h2>
           <p className="mx-auto mb-12 max-w-2xl text-center text-slate-600">
-            From school bursars to mosque treasurers — ThriveFund is a fintech operations dashboard, not just a fundraising tool.
+            From school bursars to department treasurers — ThriveFund is a fintech operations dashboard, not just a fundraising tool.
           </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {useCases.map((uc) => {

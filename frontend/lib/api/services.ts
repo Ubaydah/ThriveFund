@@ -69,7 +69,7 @@ export const goalsApi = {
   contributors: (id: string) => apiRequest<Contributor[]>(`/goals/${id}/contributors`),
   addContributor: (id: string, body: { name: string; email?: string; phone_number?: string }) =>
     apiRequest<Contributor>(`/goals/${id}/contributors`, { method: 'POST', body: JSON.stringify(body) }),
-  sendInvitations: (id: string, body: { recipients: { email: string; name?: string }[]; channel: string; message?: string }) =>
+  sendInvitations: (id: string, body: { recipients: { email: string; name?: string }[]; channel: 'email'; message?: string }) =>
     apiRequest<Invitation[]>(`/goals/${id}/invitations`, { method: 'POST', body: JSON.stringify(body) }),
   listInvitations: (id: string) => apiRequest<Invitation[]>(`/goals/${id}/invitations`),
 };

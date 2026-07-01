@@ -23,13 +23,13 @@ export default function CampaignsPage() {
   return (
     <div>
       <PageHeader
-        title="Campaigns"
-        description="Payment campaigns for fees, dues, donations, and events"
-        action={<Button asChild><Link href="/dashboard/campaigns/new"><Plus className="h-4 w-4" /> New Campaign</Link></Button>}
+        title="Collections"
+        description="Payment collections for tuition, department dues, levies, donations, and events"
+        action={<Button asChild><Link href="/dashboard/campaigns/new"><Plus className="h-4 w-4" /> New Collection</Link></Button>}
       />
 
       {!campaigns.length ? (
-        <EmptyState title="No campaigns yet" description="Create a campaign and assign a virtual account." />
+        <EmptyState title="No collections yet" description="Create a collection and assign a virtual account." />
       ) : (
         <div className="space-y-4">
           {campaigns.map((c) => {

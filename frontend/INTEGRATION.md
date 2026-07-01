@@ -67,7 +67,7 @@ NOMBA_WEBHOOK_SECRET=...
 | Reconciliation | GET /reconciliation/overview, GET /reconciliation |
 | Contributors | GET /contributors |
 | Reports | GET /reports/financial-summary, GET /reports/transactions/export, GET /analytics/* |
-| Invitations | GET /goals, POST/GET /goals/:id/invitations |
+| Invitations | GET /goals, GET /goals/:id/share, POST/GET /goals/:id/invitations |
 | Analytics | GET /analytics/* |
 | Notifications | GET /notifications, POST /notifications/read-all |
 | Settings | GET/PATCH /users/me, PATCH /users/me/password |
@@ -86,7 +86,7 @@ NOMBA_WEBHOOK_SECRET=...
 - Aggregated organization stats (campaigns count, volume) on org list
 - Per-contributor outstanding balance tracking
 - On-demand PDF report generation
-- Global invitations list (must select a campaign — uses GET /goals/:id/invitations)
+- Global invitations list (must select a collection — uses GET /goals/:id/invitations)
 
 ## Validation Flow
 

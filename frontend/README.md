@@ -46,14 +46,14 @@ Open [http://localhost:3000](http://localhost:3000)
 | `/login` | Sign in |
 | `/dashboard` | Organization dashboard |
 | `/dashboard/organizations` | Manage organizations |
-| `/dashboard/campaigns` | Payment campaigns |
-| `/dashboard/campaigns/[id]` | Campaign detail |
+| `/dashboard/campaigns` | Payment collections |
+| `/dashboard/campaigns/[id]` | Collection detail |
 | `/dashboard/virtual-accounts` | Virtual accounts |
 | `/dashboard/transactions` | Transactions |
 | `/dashboard/reconciliation` | Reconciliation dashboard |
 | `/dashboard/contributors` | Members |
 | `/dashboard/reports` | Reports |
-| `/dashboard/invitations` | Invitations |
+| `/dashboard/invitations` | Email invitations and CSV/TSV recipient import |
 | `/admin` | Platform admin |
 | `/c/[slug]` | Public campaign page |
 | `/c/success` | Contribution receipt |

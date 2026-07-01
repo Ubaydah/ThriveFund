@@ -287,9 +287,12 @@ export function usePublicVirtualAccount(slug: string) {
 export function useSendInvitations(goalId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { recipients: { email: string; name?: string }[]; channel: string; message?: string }) =>
+    mutationFn: (body: { recipients: { email: string; name?: string }[]; channel: 'email'; message?: string }) =>
       goalsApi.sendInvitations(goalId, body),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.goalInvitations(goalId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.goalInvitations(goalId) });
+      qc.invalidateQueries({ queryKey: queryKeys.goalContributors(goalId) });
+    },
   });
 }
 
