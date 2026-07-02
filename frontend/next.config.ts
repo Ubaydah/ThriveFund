@@ -1,9 +1,11 @@
 import type { NextConfig } from 'next';
-import path from 'path';
+
+const isExport = process.env.NODE_ENV === 'production';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  outputFileTracingRoot: path.join(__dirname),
+  ...(isExport && { output: 'export', trailingSlash: true }),
+  images: { unoptimized: true },
 };
 
 export default nextConfig;
