@@ -3,7 +3,7 @@
 import Link from 'next/link';
 
 import { usePathname } from 'next/navigation';
-import { Copy, QrCode, Share2, ArrowLeft } from 'lucide-react';
+import { Copy, QrCode, Share2, ArrowLeft, Plus } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/page-header';
