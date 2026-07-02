@@ -30,6 +30,18 @@ type NombaResponse<T> = {
   data?: T;
 };
 
+type NombaErrorDetails = {
+  provider: PaymentProviderName.Nomba;
+  environment: typeof env.NOMBA_ENVIRONMENT;
+  scope: typeof env.NOMBA_VIRTUAL_ACCOUNT_SCOPE;
+  method: string;
+  path: string;
+  status?: number;
+  providerCode?: string;
+  providerMessage?: string;
+  responseKeys?: string[];
+};
+
 type NombaVirtualAccount = {
   accountId?: string;
   id?: string;
@@ -117,6 +129,23 @@ function nombaBaseUrl(): string {
 
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function nombaMessage(json: NombaResponse<unknown>): string | undefined {
+  return (
+    asString(json.description) ??
+    asString(json.responseMessage) ??
+    asString(json.message)
+  );
+}
+
+function nombaCode(json: NombaResponse<unknown>): string | undefined {
+  return asString(json.code) ?? asString(json.responseCode);
+}
+
+function responseKeys(value: unknown): string[] | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  return Object.keys(value as Record<string, unknown>).slice(0, 20);
 }
 
 function mapStatus(status: string): VerifiedPayment['status'] {
@@ -225,6 +254,13 @@ export class NombaProvider implements PaymentProvider {
     if (!accountNumber || !bankName || !bankAccountName) {
       throw Errors.provider(
         `Nomba virtual account response did not include bank details. accountRef=${account.accountRef ?? accountRef}`,
+        {
+          provider: PaymentProviderName.Nomba,
+          environment: env.NOMBA_ENVIRONMENT,
+          scope: env.NOMBA_VIRTUAL_ACCOUNT_SCOPE,
+          path,
+          responseKeys: responseKeys(account),
+        },
       );
     }
 
@@ -377,15 +413,34 @@ export class NombaProvider implements PaymentProvider {
     });
 
     const text = await response.text();
-    const json = text ? JSON.parse(text) : {};
+    let json: NombaResponse<T> & T;
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch {
+      throw Errors.provider('Nomba returned a non-JSON response', {
+        provider: PaymentProviderName.Nomba,
+        environment: env.NOMBA_ENVIRONMENT,
+        scope: env.NOMBA_VIRTUAL_ACCOUNT_SCOPE,
+        method: options.method,
+        path,
+        status: response.status,
+      } satisfies NombaErrorDetails);
+    }
 
     if (!response.ok) {
-      const message =
-        asString(json?.description) ??
-        asString(json?.responseMessage) ??
-        asString(json?.message) ??
-        `Nomba request failed with HTTP ${response.status}`;
-      throw Errors.provider(message);
+      const providerMessage = nombaMessage(json);
+      const message = providerMessage ?? `Nomba request failed with HTTP ${response.status}`;
+      throw Errors.provider(message, {
+        provider: PaymentProviderName.Nomba,
+        environment: env.NOMBA_ENVIRONMENT,
+        scope: env.NOMBA_VIRTUAL_ACCOUNT_SCOPE,
+        method: options.method,
+        path,
+        status: response.status,
+        providerCode: nombaCode(json),
+        providerMessage,
+        responseKeys: responseKeys(json),
+      } satisfies NombaErrorDetails);
     }
 
     return json;

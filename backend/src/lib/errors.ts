@@ -25,8 +25,8 @@ export const Errors = {
     new AppError(422, 'UNPROCESSABLE', msg),
   rateLimited: () =>
     new AppError(429, 'RATE_LIMITED', 'Too many requests'),
-  provider: (msg = 'External provider error') =>
-    new AppError(502, 'PROVIDER_ERROR', msg),
+  provider: (msg = 'External provider error', details?: unknown) =>
+    new AppError(502, 'PROVIDER_ERROR', msg, details),
   internal: (msg = 'Internal server error') =>
     new AppError(500, 'INTERNAL_ERROR', msg),
 };
