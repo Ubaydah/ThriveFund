@@ -9,7 +9,7 @@
     "start": "node dist/server.js",
     "migrate": "node scripts/run-migrations.js",
     "type-check": "tsc --noEmit",
-    "test": "node --test --require ts-node/register/transpile-only tests/**/*.test.ts"
+    "test": "node --test --require ts-node/register/transpile-only tests/*.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
